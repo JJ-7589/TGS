@@ -27,19 +27,24 @@ public sealed class ConsultasController : ControllerBase
         [FromQuery] string? estado)
     {
         var errors = new Dictionary<string, List<string>>();
-        var parsedUserId = DomainValidation.ParseOptionalPositiveId(userId, "userId", errors);
-        var parsedMascotaId = DomainValidation.ParseOptionalPositiveId(mascotaId, "mascotaId", errors);
+        var rawUserId = Request.Query.ContainsKey("userId") ? Request.Query["userId"].ToString() : userId;
+        var rawMascotaId = Request.Query.ContainsKey("mascotaId") ? Request.Query["mascotaId"].ToString() : mascotaId;
+        var rawTipoServicio = Request.Query.ContainsKey("tipoServicio") ? Request.Query["tipoServicio"].ToString() : tipoServicio;
+        var rawEstado = Request.Query.ContainsKey("estado") ? Request.Query["estado"].ToString() : estado;
+
+        var parsedUserId = DomainValidation.ParseOptionalPositiveId(rawUserId, "userId", errors);
+        var parsedMascotaId = DomainValidation.ParseOptionalPositiveId(rawMascotaId, "mascotaId", errors);
 
         string? normalizedTipoServicio = null;
-        if (tipoServicio is not null)
+        if (rawTipoServicio is not null)
         {
-            normalizedTipoServicio = DomainValidation.ValidateTipoServicio(tipoServicio, errors, "tipoServicio");
+            normalizedTipoServicio = DomainValidation.ValidateTipoServicio(rawTipoServicio, errors, "tipoServicio");
         }
 
         string? normalizedEstado = null;
-        if (estado is not null)
+        if (rawEstado is not null)
         {
-            normalizedEstado = DomainValidation.ValidateEstadoConsulta(estado, required: true, errors, "estado");
+            normalizedEstado = DomainValidation.ValidateEstadoConsulta(rawEstado, required: true, errors, "estado");
         }
 
         DomainValidation.ThrowIfErrors(errors);

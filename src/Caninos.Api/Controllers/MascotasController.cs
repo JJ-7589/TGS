@@ -23,7 +23,8 @@ public sealed class MascotasController : ControllerBase
     public async Task<ActionResult<List<MascotaResponse>>> GetAll([FromQuery] string? userId)
     {
         var errors = new Dictionary<string, List<string>>();
-        var parsedUserId = DomainValidation.ParseOptionalPositiveId(userId, "userId", errors);
+        var rawUserId = Request.Query.ContainsKey("userId") ? Request.Query["userId"].ToString() : userId;
+        var parsedUserId = DomainValidation.ParseOptionalPositiveId(rawUserId, "userId", errors);
         DomainValidation.ThrowIfErrors(errors);
 
         var mascotas = await _mascotaService.GetAllAsync(parsedUserId);
