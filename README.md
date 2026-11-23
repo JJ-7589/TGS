@@ -43,7 +43,8 @@ Una vez veas `Now listening on: http://localhost:5150`, abre tu navegador en:
 
 | Recurso | URL |
 | :--- | :--- |
-| **Aplicación Web (Frontend conectado al Backend)** | `http://localhost:5150` |
+| **Aplicación Web (redirige automáticamente a `/login`)** | `http://localhost:5150` → `http://localhost:5150/login` |
+| **Panel principal (requiere iniciar sesión)** | `http://localhost:5150/dashboard` |
 | **Documentación interactiva (Swagger UI)** | `http://localhost:5150/swagger` |
 | **Estado del servidor y SQLite (Health)** | `http://localhost:5150/api/health` |
 

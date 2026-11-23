@@ -62,8 +62,23 @@ public sealed class AuthAndProtocolTests : IClassFixture<CustomWebApplicationFac
         Assert.Contains(expectedContent, text);
     }
 
+    [Fact]
+    public async Task RootPath_RedirectsAutomaticallyToLogin()
+    {
+        var noRedirectClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        var res = await noRedirectClient.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        Assert.Equal("/login", res.Headers.Location?.OriginalString);
+    }
+
     [Theory]
-    [InlineData("/", "Centro Canino")]
+    [InlineData("/login", "Iniciar Sesión")]
+    [InlineData("/registro", "Crear Cuenta")]
+    [InlineData("/dashboard", "Centro Canino")]
     [InlineData("/apiClient.js", "API_BASE_URL")]
     [InlineData("/app.js", "showDashboard")]
     [InlineData("/styles.css", "--primary")]

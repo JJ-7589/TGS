@@ -198,10 +198,6 @@ var frontendDir = frontendCandidates.FirstOrDefault(Directory.Exists);
 if (frontendDir is not null)
 {
     var frontendProvider = new PhysicalFileProvider(frontendDir);
-    app.UseDefaultFiles(new DefaultFilesOptions
-    {
-        FileProvider = frontendProvider
-    });
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = frontendProvider
@@ -213,6 +209,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Flujo orgánico del frontend: "/" redirige automáticamente a "/login"
+if (frontendDir is not null)
+{
+    var indexHtmlPath = Path.Combine(frontendDir, "index.html");
+    app.MapGet("/", () => Results.Redirect("/login", permanent: false)).ExcludeFromDescription();
+    app.MapGet("/login", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
+    app.MapGet("/registro", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
+    app.MapGet("/dashboard", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
+}
 
 app.Run();
 

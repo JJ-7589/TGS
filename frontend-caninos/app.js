@@ -141,8 +141,33 @@ function isValidNumericPassword(pwd) {
   return /^\d{5,20}$/.test(pwd);
 }
 
-// ==================== NAVEGACIÓN DE VISTAS ====================
+// ==================== NAVEGACIÓN DE VISTAS Y RUTAS ====================
 let isRegisterMode = false;
+const useCleanRoutes =
+  window.location.protocol.startsWith("http") &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+  window.location.port === "5150";
+
+function navigatePath(targetPath, { replace = false } = {}) {
+  if (!useCleanRoutes || window.location.pathname === targetPath) return;
+  if (replace) {
+    window.history.replaceState(null, "", targetPath);
+  } else {
+    window.history.pushState(null, "", targetPath);
+  }
+}
+
+function applyAuthMode(registerMode, { syncUrl = true } = {}) {
+  isRegisterMode = registerMode;
+  hideError(loginError);
+  hideError(registerError);
+  loginForm.classList.toggle("hidden", isRegisterMode);
+  registerForm.classList.toggle("hidden", !isRegisterMode);
+  updateToggleAuthLabel();
+  if (syncUrl) {
+    navigatePath(isRegisterMode ? "/registro" : "/login");
+  }
+}
 
 function updateToggleAuthLabel() {
   if (isRegisterMode) {
@@ -160,12 +185,7 @@ function updateToggleAuthLabel() {
 }
 
 function toggleAuthMode() {
-  isRegisterMode = !isRegisterMode;
-  hideError(loginError);
-  hideError(registerError);
-  loginForm.classList.toggle("hidden", isRegisterMode);
-  registerForm.classList.toggle("hidden", !isRegisterMode);
-  updateToggleAuthLabel();
+  applyAuthMode(!isRegisterMode);
 }
 
 btnToggleAuth.addEventListener("click", toggleAuthMode);
@@ -184,7 +204,7 @@ async function refreshBackendStatus() {
   }
 }
 
-async function showDashboard() {
+async function showDashboard({ replaceUrl = false } = {}) {
   sessionExpiredHandled = false;
   const user = getCurrentUser();
   currentUserLabel.textContent = user
@@ -193,20 +213,33 @@ async function showDashboard() {
 
   authSection.classList.add("hidden");
   dashboardSection.classList.remove("hidden");
+  navigatePath("/dashboard", { replace: replaceUrl });
 
   await Promise.all([loadClientes(), loadMascotas(), loadConsultas()]);
 }
 
-function showAuth() {
+function showAuth({ register = false, replaceUrl = true } = {}) {
   clearSession();
   dashboardSection.classList.add("hidden");
   authSection.classList.remove("hidden");
   loginForm.reset();
   registerForm.reset();
-  hideError(loginError);
-  hideError(registerError);
+  applyAuthMode(register, { syncUrl: false });
+  navigatePath(register ? "/registro" : "/login", { replace: replaceUrl });
   refreshBackendStatus();
 }
+
+window.addEventListener("popstate", () => {
+  if (!useCleanRoutes) return;
+  const path = window.location.pathname.toLowerCase();
+  if (getToken()) {
+    if (path === "/login" || path === "/registro") {
+      navigatePath("/dashboard", { replace: true });
+    }
+    return;
+  }
+  applyAuthMode(path === "/registro", { syncUrl: false });
+});
 
 window.addEventListener("session-expired", () => {
   if (sessionExpiredHandled) return;
@@ -1083,9 +1116,9 @@ tbodyConsultas.addEventListener("click", async (e) => {
 });
 
 // ==================== ARRANQUE INICIAL ====================
-updateToggleAuthLabel();
+const initialPath = window.location.pathname.toLowerCase();
 if (getToken()) {
-  showDashboard();
+  showDashboard({ replaceUrl: true });
 } else {
-  showAuth();
+  showAuth({ register: initialPath === "/registro", replaceUrl: true });
 }
