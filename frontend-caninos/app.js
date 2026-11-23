@@ -1,14 +1,18 @@
 import {
   apiRequest,
+  checkBackendHealth,
   getToken,
   getCurrentUser,
   setSession,
+  updateCurrentUser,
   clearSession,
 } from "./apiClient.js";
 
 // ==================== ESTADO EN MEMORIA ====================
 const state = {
+  allClientes: [],
   clientes: [],
+  allMascotas: [],
   mascotas: [],
   consultas: [],
 };
@@ -26,6 +30,7 @@ const toggleAuthText = document.getElementById("toggle-auth-text");
 const btnToggleAuth = document.getElementById("btn-toggle-auth");
 const currentUserLabel = document.getElementById("current-user-label");
 const btnLogout = document.getElementById("btn-logout");
+const backendStatusEl = document.getElementById("backend-status");
 
 // Pestañas
 const tabButtons = document.querySelectorAll(".tab-btn");
@@ -165,7 +170,22 @@ function toggleAuthMode() {
 
 btnToggleAuth.addEventListener("click", toggleAuthMode);
 
+let sessionExpiredHandled = false;
+
+async function refreshBackendStatus() {
+  if (!backendStatusEl) return;
+  try {
+    await checkBackendHealth();
+    backendStatusEl.textContent = "🟢 Backend y SQLite conectados";
+    backendStatusEl.className = "status-pill status-online";
+  } catch {
+    backendStatusEl.textContent = "🔴 Backend desconectado (inicia el servidor en puerto 5150)";
+    backendStatusEl.className = "status-pill status-offline";
+  }
+}
+
 async function showDashboard() {
+  sessionExpiredHandled = false;
   const user = getCurrentUser();
   currentUserLabel.textContent = user
     ? `${user.nombreCompleto} (@${user.username})`
@@ -185,9 +205,12 @@ function showAuth() {
   registerForm.reset();
   hideError(loginError);
   hideError(registerError);
+  refreshBackendStatus();
 }
 
 window.addEventListener("session-expired", () => {
+  if (sessionExpiredHandled) return;
+  sessionExpiredHandled = true;
   showAuth();
   showToast("Tu sesión expiró o no es válida. Inicia sesión nuevamente.", "error");
 });
@@ -300,7 +323,7 @@ function populateClienteSelects() {
   const prevMascotaFilter = filterMascotaCliente.value;
   const prevConsultaFilter = filterConsultaCliente.value;
 
-  const optionsHtml = state.clientes
+  const optionsHtml = state.allClientes
     .map(
       (c) =>
         `<option value="${c.id}">${escapeHtml(c.nombreCompleto)} (${escapeHtml(c.documento)})</option>`
@@ -319,8 +342,8 @@ function populateClienteSelects() {
 function populateConsultaMascotaFilter(userIdFilter = "") {
   const prevValue = filterConsultaMascota.value;
   const list = userIdFilter
-    ? state.mascotas.filter((m) => String(m.userId) === String(userIdFilter))
-    : state.mascotas;
+    ? state.allMascotas.filter((m) => String(m.userId) === String(userIdFilter))
+    : state.allMascotas;
 
   filterConsultaMascota.innerHTML =
     `<option value="">Filtrar por Canino...</option>` +
@@ -345,15 +368,30 @@ filterConsultaCliente.addEventListener("change", () => {
 // =========================================================
 async function loadClientes(search = "") {
   try {
-    const query = search.trim()
-      ? `?search=${encodeURIComponent(search.trim())}`
-      : "";
+    const trimmed = search.trim();
+    const query = trimmed ? `?search=${encodeURIComponent(trimmed)}` : "";
     const data = await apiRequest(`/usuarios${query}`);
     state.clientes = Array.isArray(data) ? data : [];
+    if (!trimmed) {
+      state.allClientes = state.clientes;
+    } else if (state.allClientes.length === 0) {
+      const full = await apiRequest("/usuarios");
+      state.allClientes = Array.isArray(full) ? full : [];
+    }
     renderClientesTable();
     populateClienteSelects();
   } catch (err) {
     showToast(err.message, "error");
+  }
+}
+
+async function refreshClientesCatalog() {
+  try {
+    const full = await apiRequest("/usuarios");
+    state.allClientes = Array.isArray(full) ? full : [];
+    populateClienteSelects();
+  } catch {
+    // Manejado por apiRequest si la sesión expiró
   }
 }
 
@@ -494,15 +532,24 @@ function openClienteModal(cliente) {
 
     try {
       if (isEdit) {
-        await apiRequest(`/usuarios/${cliente.id}`, { method: "PUT", body: payload });
+        const updated = await apiRequest(`/usuarios/${cliente.id}`, { method: "PUT", body: payload });
+        const currentUser = getCurrentUser();
+        if (currentUser && String(currentUser.id) === String(updated.id)) {
+          updateCurrentUser(updated);
+          currentUserLabel.textContent = `${updated.nombreCompleto} (@${updated.username})`;
+        }
         showToast("Cliente actualizado correctamente.", "success");
       } else {
         await apiRequest("/usuarios", { method: "POST", body: payload });
         showToast("Cliente registrado correctamente.", "success");
       }
       closeModal();
-      await loadClientes(searchClientesInput.value);
-      await loadMascotas(filterMascotaCliente.value);
+      await refreshClientesCatalog();
+      await Promise.all([
+        loadClientes(searchClientesInput.value),
+        loadMascotas(filterMascotaCliente.value),
+        loadConsultas(),
+      ]);
     } catch (err) {
       renderApiError(errBox, err);
     }
@@ -525,6 +572,7 @@ tbodyClientes.addEventListener("click", async (e) => {
     try {
       await apiRequest(`/usuarios/${delId}`, { method: "DELETE" });
       showToast("Cliente eliminado.", "success");
+      await refreshClientesCatalog();
       await loadClientes(searchClientesInput.value);
     } catch (err) {
       showToast(err.message, "error");
@@ -540,10 +588,26 @@ async function loadMascotas(userId = "") {
     const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
     const data = await apiRequest(`/mascotas${query}`);
     state.mascotas = Array.isArray(data) ? data : [];
+    if (!userId) {
+      state.allMascotas = state.mascotas;
+    } else if (state.allMascotas.length === 0) {
+      const full = await apiRequest("/mascotas");
+      state.allMascotas = Array.isArray(full) ? full : [];
+    }
     renderMascotasTable();
     populateConsultaMascotaFilter(filterConsultaCliente.value);
   } catch (err) {
     showToast(err.message, "error");
+  }
+}
+
+async function refreshMascotasCatalog() {
+  try {
+    const full = await apiRequest("/mascotas");
+    state.allMascotas = Array.isArray(full) ? full : [];
+    populateConsultaMascotaFilter(filterConsultaCliente.value);
+  } catch {
+    // Manejado por apiRequest si la sesión expiró
   }
 }
 
@@ -585,7 +649,7 @@ document.getElementById("btn-reset-mascotas").addEventListener("click", () => {
 });
 
 document.getElementById("btn-new-mascota").addEventListener("click", () => {
-  if (state.clientes.length === 0) {
+  if (state.allClientes.length === 0) {
     showToast("Primero debes registrar al menos un cliente.", "error");
     return;
   }
@@ -594,7 +658,7 @@ document.getElementById("btn-new-mascota").addEventListener("click", () => {
 
 function openMascotaModal(mascota) {
   const isEdit = Boolean(mascota);
-  const clienteOptions = state.clientes
+  const clienteOptions = state.allClientes
     .map(
       (c) =>
         `<option value="${c.id}" ${
@@ -700,7 +764,11 @@ function openMascotaModal(mascota) {
         showToast("Canino registrado correctamente.", "success");
       }
       closeModal();
-      await loadMascotas(filterMascotaCliente.value);
+      await refreshMascotasCatalog();
+      await Promise.all([
+        loadMascotas(filterMascotaCliente.value),
+        loadConsultas(),
+      ]);
     } catch (err) {
       renderApiError(errBox, err);
     }
@@ -721,6 +789,7 @@ tbodyMascotas.addEventListener("click", async (e) => {
     try {
       await apiRequest(`/mascotas/${delId}`, { method: "DELETE" });
       showToast("Canino eliminado.", "success");
+      await refreshMascotasCatalog();
       await loadMascotas(filterMascotaCliente.value);
     } catch (err) {
       showToast(err.message, "error");
@@ -809,7 +878,7 @@ document.getElementById("btn-reset-consultas").addEventListener("click", () => {
 });
 
 document.getElementById("btn-new-consulta").addEventListener("click", () => {
-  if (state.clientes.length === 0 || state.mascotas.length === 0) {
+  if (state.allClientes.length === 0 || state.allMascotas.length === 0) {
     showToast("Necesitas al menos un cliente y un canino registrado para crear una consulta.", "error");
     return;
   }
@@ -819,7 +888,7 @@ document.getElementById("btn-new-consulta").addEventListener("click", () => {
 function openConsultaModal(consulta) {
   const isEdit = Boolean(consulta);
 
-  const clienteOptions = state.clientes
+  const clienteOptions = state.allClientes
     .map(
       (c) =>
         `<option value="${c.id}" ${
@@ -923,7 +992,7 @@ function openConsultaModal(consulta) {
 
   function syncMascotasForCliente(selectedMascotaId = null) {
     const uid = selectCliente.value;
-    const ownerMascotas = state.mascotas.filter(
+    const ownerMascotas = state.allMascotas.filter(
       (m) => String(m.userId) === String(uid)
     );
 
@@ -954,7 +1023,15 @@ function openConsultaModal(consulta) {
     hideError(errBox);
 
     const localDateStr = document.getElementById("con-fechaConsulta").value;
-    const fechaIso = new Date(localDateStr).toISOString();
+    const parsedDate = new Date(localDateStr);
+    if (!localDateStr || Number.isNaN(parsedDate.getTime())) {
+      renderApiError(errBox, {
+        message: "Error de validación local.",
+        errors: { fechaConsulta: ["Debes seleccionar una fecha y hora válidas."] },
+      });
+      return;
+    }
+    const fechaIso = parsedDate.toISOString();
     const obsVal = document.getElementById("con-observaciones").value.trim();
 
     const payload = {
@@ -1012,5 +1089,3 @@ if (getToken()) {
 } else {
   showAuth();
 }
-
-await loadConsultas();

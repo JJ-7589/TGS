@@ -17,6 +17,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <span class="brand-badge">🐾 Gestión Integral Canina</span>
+        <div id="backend-status" class="status-pill status-checking">Verificando conexión con el backend...</div>
         <h1 id="auth-title">Iniciar Sesión</h1>
         <p id="auth-subtitle">Ingresa con tus credenciales para administrar el sistema</p>
       </div>
@@ -25,7 +26,7 @@
       <form id="login-form" class="form-stack">
         <div class="form-group">
           <label for="login-username">Usuario</label>
-          <input type="text" id="login-username" placeholder="" required minlength="3" maxlength="50" />
+          <input type="text" id="login-username" placeholder="Ej: admin" required minlength="3" maxlength="50" />
         </div>
 
         <div class="form-group">
@@ -35,7 +36,7 @@
             id="login-password"
             inputmode="numeric"
             pattern="\d{5,20}"
-            placeholder=""
+            placeholder="Ej: 12345"
             required
           />
           <small class="hint">Solo dígitos (0-9), entre 5 y 20 caracteres.</small>

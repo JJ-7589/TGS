@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
@@ -186,6 +187,26 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Caninos API v1");
     options.RoutePrefix = "swagger";
 });
+
+// Servir el frontend (frontend-caninos) directamente desde http://localhost:5150/
+var frontendCandidates = new[]
+{
+    Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "frontend-caninos")),
+    Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "frontend-caninos"))
+};
+var frontendDir = frontendCandidates.FirstOrDefault(Directory.Exists);
+if (frontendDir is not null)
+{
+    var frontendProvider = new PhysicalFileProvider(frontendDir);
+    app.UseDefaultFiles(new DefaultFilesOptions
+    {
+        FileProvider = frontendProvider
+    });
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = frontendProvider
+    });
+}
 
 app.UseCors("FrontendLocal");
 app.UseAuthentication();

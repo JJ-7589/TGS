@@ -1,64 +1,74 @@
-# Sistema de Registro de Salud, Estética y Recreación de Caninos — Backend (.NET + SQLite)
+# Sistema de Registro de Salud, Estética y Recreación de Caninos (.NET + SQLite + Frontend Web)
 
-Backend REST API desarrollado en **.NET 10 (ASP.NET Core)** con base de datos **SQLite** para el registro de clientes (`usuarios`), caninos (`mascotas`) y servicios de salud, estética y recreación (`consultas`).
+Sistema full-stack desarrollado en **.NET 10 (ASP.NET Core)** con base de datos **SQLite** y frontend web en **HTML + CSS + JavaScript (ES Modules)** para el registro de clientes (`usuarios`), caninos (`mascotas`) y servicios de salud, estética y recreación (`consultas`).
 
-## Documentación para el Frontend
+## Documentación de la API
 
 Consulta el contrato completo de endpoints, tipos de datos, códigos HTTP, casos de extremo y ejemplos en JavaScript (`fetch`) en:
 
-- **[`API_DOCS.md`](./API_DOCS.md)** — Guía completa de integración para el equipo de frontend.
+- **[`API_DOCS.md`](./API_DOCS.md)** — Guía completa de integración para el frontend.
 
 ## Estructura del Proyecto
 
 ```text
-├── API_DOCS.md                        # Contrato de API y guía para frontend
+├── API_DOCS.md                        # Contrato de API y guía de endpoints
 ├── Caninos.sln                        # Solución .NET
 ├── database/
 │   └── schema.sql                     # Esquema SQLite (usuarios, mascotas, consultas + FKs e índices)
+├── frontend-caninos/
+│   ├── index.html                     # Interfaz web (Login, Registro, Clientes, Caninos, Consultas)
+│   ├── styles.css                     # Estilos de la aplicación
+│   ├── apiClient.js                   # Cliente HTTP conectado a http://localhost:5150/api
+│   └── app.js                         # Lógica de los módulos del frontend
 ├── src/
-│   └── Caninos.Api/
-│       ├── Controllers/               # Health, Auth, Usuarios, Mascotas, Consultas
-│       ├── Data/                      # AppDbContext, DbInitializer, SqliteForeignKeysInterceptor
-│       ├── Dtos/                      # Contratos de entrada/salida y ApiErrorResponse
-│       ├── Middleware/                # Manejo global de errores y respuestas HTTP uniformes
-│       ├── Models/                    # Entidades Usuario, Mascota, Consulta
-│       ├── Services/                  # Lógica de negocio y JWT (sin roles)
-│       ├── Validation/                # Validaciones estrictas de dominio y JSON
-│       └── Program.cs                 # Configuración del host, SQLite, JWT, CORS y Swagger
+│   └── Caninos.Api/                   # Backend ASP.NET Core + SQLite + JWT + Swagger + archivos estáticos
 └── tests/
-    └── Caninos.Api.Tests/             # Pruebas de integración end-to-end (xUnit + WebApplicationFactory)
+    └── Caninos.Api.Tests/             # Batería de pruebas automatizadas (xUnit + WebApplicationFactory)
 ```
 
-## Cómo ejecutar el backend en local
+## Cómo emular / ejecutar el sistema completo en local
 
 ### Requisitos
-- [.NET 10 SDK](https://dotnet.microsoft.com/) (el archivo SQLite `storage/caninos.db` y sus tablas se crean automáticamente al iniciar).
+- [.NET 10 SDK](https://dotnet.microsoft.com/) (no requiere Node.js ni servidores externos: el backend sirve automáticamente el frontend y crea la base de datos SQLite `storage/caninos.db`).
 
-### Comandos
+### Opción 1 (Recomendada): Todo en un solo comando
+
+Desde la raíz del repositorio (`D:\TGS\TGS`):
 
 ```bash
-# 1. Restaurar dependencias
-dotnet restore Caninos.sln
-
-# 2. Iniciar el servidor en http://localhost:5150
 dotnet run --project src/Caninos.Api
 ```
 
-- **URL Base:** `http://localhost:5150`
-- **Swagger UI:** `http://localhost:5150/swagger`
-- **Health check:** `GET http://localhost:5150/api/health`
-- **Base de datos SQLite generada:** `storage/caninos.db` (relativa al directorio de ejecución)
-- **Credenciales iniciales (usuario semilla):** `username`: `admin` | `password`: `12345`
+Una vez veas `Now listening on: http://localhost:5150`, abre tu navegador en:
 
-### Ejecutar pruebas automatizadas
+| Recurso | URL |
+| :--- | :--- |
+| **Aplicación Web (Frontend conectado al Backend)** | `http://localhost:5150` |
+| **Documentación interactiva (Swagger UI)** | `http://localhost:5150/swagger` |
+| **Estado del servidor y SQLite (Health)** | `http://localhost:5150/api/health` |
+
+### Credenciales iniciales (usuario semilla)
+- **Usuario:** `admin`
+- **Contraseña numérica:** `12345`
+
+*(También puedes crear nuevas cuentas desde el botón **"Regístrate aquí"** en la pantalla de inicio de sesión).*
+
+### Opción 2 (Opcional): Ejecutar frontend en un puerto separado
+
+Si prefieres levantar `frontend-caninos/` por separado (por ejemplo con la extensión **Live Server** de VS Code o `python -m http.server 5500 --directory frontend-caninos`):
+1. Inicia primero el backend con `dotnet run --project src/Caninos.Api` (puerto `5150`).
+2. Abre el frontend en `http://localhost:5500` (o `http://127.0.0.1:5500`). `apiClient.js` apunta automáticamente a `http://localhost:5150/api` y CORS ya está habilitado para `localhost` y `127.0.0.1`.
+> No abras `index.html` con doble clic (`file://`), porque los navegadores bloquean módulos ES6 (`type="module"`) sin servidor HTTP.
+
+## Ejecutar pruebas automatizadas
 
 ```bash
-dotnet test tests/Caninos.Api.Tests/Caninos.Api.Tests.csproj
+dotnet test tests/Caninos.Api.Tests/Caninos.Api.Tests.csproj -c Release
 ```
 
 ## Resumen de Arquitectura y Validaciones
 
-- **Base de datos:** SQLite con `PRAGMA foreign_keys = ON` en cada conexión y restricciones `CHECK` / `UNIQUE` / `FOREIGN KEY ... ON DELETE RESTRICT`.
+- **Base de datos:** SQLite (`storage/caninos.db`) con `PRAGMA foreign_keys = ON` en cada conexión y restricciones `CHECK` / `UNIQUE` / `FOREIGN KEY ... ON DELETE RESTRICT`.
 - **Relaciones:**
   - `usuarios` (1) ── (N) `mascotas` (`mascotas.user_id` → `usuarios.id`)
   - `mascotas` (1) ── (N) `consultas` (`consultas.mascota_id` → `mascotas.id`)

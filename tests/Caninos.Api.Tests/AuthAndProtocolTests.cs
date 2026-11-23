@@ -63,6 +63,19 @@ public sealed class AuthAndProtocolTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Theory]
+    [InlineData("/", "Centro Canino")]
+    [InlineData("/apiClient.js", "API_BASE_URL")]
+    [InlineData("/app.js", "showDashboard")]
+    [InlineData("/styles.css", "--primary")]
+    public async Task FrontendStaticFiles_ServedDirectlyFromBackend(string path, string expectedSnippet)
+    {
+        var res = await _client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var content = await res.Content.ReadAsStringAsync();
+        Assert.Contains(expectedSnippet, content);
+    }
+
+    [Theory]
     [InlineData("admin", "12345")]
     [InlineData("ADMIN", "12345")]
     [InlineData("  AdMiN  ", "12345")]

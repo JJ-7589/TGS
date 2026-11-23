@@ -1,4 +1,13 @@
-const API_BASE_URL = "http://localhost:5150/api";
+const DEFAULT_API_ORIGIN = "http://localhost:5150";
+
+export const API_ORIGIN =
+  window.location.protocol.startsWith("http") &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+  window.location.port === "5150"
+    ? window.location.origin
+    : DEFAULT_API_ORIGIN;
+
+export const API_BASE_URL = `${API_ORIGIN}/api`;
 
 export function getToken() {
   return localStorage.getItem("caninos_token");
@@ -18,9 +27,17 @@ export function setSession(authData) {
   localStorage.setItem("caninos_user", JSON.stringify(authData.usuario));
 }
 
+export function updateCurrentUser(usuario) {
+  localStorage.setItem("caninos_user", JSON.stringify(usuario));
+}
+
 export function clearSession() {
   localStorage.removeItem("caninos_token");
   localStorage.removeItem("caninos_user");
+}
+
+export async function checkBackendHealth() {
+  return apiRequest("/health", { method: "GET", auth: false });
 }
 
 /**
@@ -49,7 +66,7 @@ export async function apiRequest(path, { method = "GET", body, auth = true } = {
     });
   } catch {
     const networkErr = new Error(
-      "No se pudo conectar con el servidor (http://localhost:5150). Verifica que el backend esté ejecutándose."
+      `No se pudo conectar con el servidor (${API_ORIGIN}). Verifica que el backend esté ejecutándose.`
     );
     networkErr.status = 0;
     networkErr.errors = {};
