@@ -7,7 +7,7 @@ import {
   setSession,
   updateCurrentUser,
   clearSession,
-} from "./apiClient.js";
+} from "./apiClient.js?v=20261123-1";
 
 // ==================== ESTADO EN MEMORIA ====================
 const state = {
@@ -522,6 +522,19 @@ function closeModal() {
 }
 
 btnCloseModal.addEventListener("click", closeModal);
+// Nunca cerrar los modales de formulario al hacer clic fuera (en el fondo oscuro)
+modalOverlay.addEventListener("mousedown", (e) => {
+  if (e.target === modalOverlay) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+});
+modalOverlay.addEventListener("click", (e) => {
+  if (e.target === modalOverlay) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+});
 
 // ==================== SELECTORES AUXILIARES ====================
 function populateClienteSelects() {
