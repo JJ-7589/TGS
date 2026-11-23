@@ -219,7 +219,13 @@ if (frontendDir is not null)
     var frontendProvider = new PhysicalFileProvider(frontendDir);
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = frontendProvider
+        FileProvider = frontendProvider,
+        OnPrepareResponse = ctx =>
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            ctx.Context.Response.Headers.Pragma = "no-cache";
+            ctx.Context.Response.Headers.Expires = "0";
+        }
     });
 }
 
@@ -234,11 +240,19 @@ app.MapControllers();
 if (frontendDir is not null)
 {
     var indexHtmlPath = Path.Combine(frontendDir, "index.html");
+    IResult ServeNoCacheIndex(HttpContext ctx)
+    {
+        ctx.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        ctx.Response.Headers.Pragma = "no-cache";
+        ctx.Response.Headers.Expires = "0";
+        return Results.File(indexHtmlPath, "text/html; charset=utf-8");
+    }
+
     app.MapGet("/", () => Results.Redirect("/login", permanent: false)).ExcludeFromDescription();
-    app.MapGet("/login", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
-    app.MapGet("/registro", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
-    app.MapGet("/dashboard", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
-    app.MapGet("/perfil", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
+    app.MapGet("/login", ServeNoCacheIndex).ExcludeFromDescription();
+    app.MapGet("/registro", ServeNoCacheIndex).ExcludeFromDescription();
+    app.MapGet("/dashboard", ServeNoCacheIndex).ExcludeFromDescription();
+    app.MapGet("/perfil", ServeNoCacheIndex).ExcludeFromDescription();
 }
 
 app.Run();
