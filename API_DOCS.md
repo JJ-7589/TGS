@@ -2,9 +2,9 @@
 
 **Proyecto:** Sistema para el registro de salud, estética y recreación de caninos  
 **Backend:** ASP.NET Core Web API (.NET) + SQLite  
-**Versión:** 1.0.0  
+**Versión:** 2.0.0  
 
-Este documento define **todos los endpoints**, **qué datos y tipos exactos esperan**, **qué códigos HTTP y respuestas devuelven**, **qué casos de extremo valida el backend** y **cómo consumirlos desde el frontend**.
+Este documento define **todos los endpoints**, **roles y middleware global de permisos (`usuario` / `admin`)**, **qué datos y tipos exactos esperan**, **qué códigos HTTP y respuestas devuelven**, **qué casos de extremo valida el backend** y **cómo consumirlos desde el frontend**.
 
 ---
 
@@ -12,22 +12,45 @@ Este documento define **todos los endpoints**, **qué datos y tipos exactos espe
 
 | Parámetro | Valor |
 | :--- | :--- |
-| **URL Base (local)** | `http://localhost:5150` |
+| **URL Base (local)** | `http://localhost:5150` (`/` redirige a `/login`) |
 | **Swagger UI (pruebas visuales)** | `http://localhost:5150/swagger` |
 | **Prefijo de la API** | `/api` |
-| **Formato de intercambio** | `application/json` (UTF-8) |
-| **Formato de fechas** | ISO-8601 UTC (ejemplo: `2026-11-22T15:30:00Z`) |
-| **Autenticación** | Bearer JWT (`Authorization: Bearer <token>`) — **sin roles** |
+| **Formato de intercambio** | `application/json` (UTF-8) y `multipart/form-data` para subir fotos |
+| **Formato de fechas** | ISO-8601 UTC (ejemplo: `2026-11-25T15:30:00Z`) |
+| **Autenticación y Roles** | Bearer JWT (`Authorization: Bearer <token>`) con roles `usuario` y `admin` gestionados globalmente por `PermissionsMiddleware` |
 | **CORS** | Habilitado para orígenes locales (`localhost` / `127.0.0.1` en cualquier puerto) |
 
 ### Credenciales iniciales (usuario semilla)
 
-Al iniciar el backend por primera vez con la base de datos vacía, se crea automáticamente un usuario inicial para poder iniciar sesión de inmediato:
+Al iniciar el backend por primera vez con la base de datos vacía, se crea automáticamente un usuario administrador inicial:
 
 - **`username`:** `admin`
 - **`password`:** `12345`
+- **`rol`:** `admin`
 
-> También es posible crear nuevos usuarios antes de iniciar sesión usando `POST /api/auth/register`, o estando autenticado usando `POST /api/usuarios`.
+> Al registrarse mediante `POST /api/auth/register`, la cuenta siempre se crea con rol `usuario`.
+
+### Matriz global de permisos (`PermissionsMiddleware`)
+
+| Rol | Alcance | Respuesta si intenta exceder permisos |
+| :--- | :--- | :---: |
+| **`admin`** | Control total sobre `/api/usuarios`, `/api/mascotas`, `/api/consultas`, `/api/perfil` y `/api/uploads`. | — |
+| **`usuario`** | Acceso a su propio perfil (`/api/perfil`, `/api/perfil/password`), subida de fotos (`/api/uploads/mascotas`), sus propias mascotas (`/api/mascotas`, `/api/mascotas/{id}/historial`) y sus propias consultas. | **`403 Forbidden`** |
+
+### Nuevos endpoints (v2.0.0)
+
+| Método | Ruta | Auth / Permiso | Descripción |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/api/perfil` | Autenticado (`usuario` / `admin`) | Obtiene los datos del usuario autenticado (incluyendo `rol`). |
+| `PUT` | `/api/perfil` | Autenticado (`usuario` / `admin`) | Actualiza los datos personales propios sin modificar el rol. |
+| `PUT` | `/api/perfil/password` | Autenticado (`usuario` / `admin`) | Cambia la contraseña numérica (`passwordActual`, `passwordNueva`, `confirmarPassword`). |
+| `POST` | `/api/uploads/mascotas` | Autenticado (`usuario` / `admin`) | Sube foto de mascota (`multipart/form-data`, campo `file`, JPG/PNG/WEBP máx. 5 MB) y devuelve `{ "fotoUrl": "/uploads/mascotas/..." }`. |
+| `GET` | `/api/mascotas/{id}/historial` | Dueño o `admin` | Devuelve `proximaCita`, `citasPrevias` y `todasLasConsultas` usando el índice compuesto `ix_consultas_mascota_id_fecha` sobre `mascota_id`. |
+
+> **Campos adicionales:**
+> - `UsuarioResponse` incluye `rol` (`"usuario"` | `"admin"`).
+> - `MascotaResponse` incluye `fotoUrl`, `proximaCita` y `totalHistorial`.
+> - `POST /api/consultas` (y `PUT /api/consultas/{id}` con estado `Programada`) valida que `fechaConsulta` **no sea anterior a la fecha y hora actual** (`400 Bad Request`).
 
 ---
 
