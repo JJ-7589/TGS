@@ -66,7 +66,8 @@ public sealed class UsuariosController : ControllerBase
             throw new ApiValidationException("El cuerpo JSON de la petición es obligatorio.");
         }
 
-        var updated = await _usuarioService.UpdateAsync(parsedId, request);
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        var updated = await _usuarioService.UpdateAsync(parsedId, request, allowRoleChange: currentUser.IsAdmin);
         return Ok(updated);
     }
 

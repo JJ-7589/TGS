@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Caninos.Api.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
@@ -19,6 +20,8 @@ public static class DbInitializer
             telefono        TEXT    NOT NULL,
             email           TEXT    NOT NULL UNIQUE COLLATE NOCASE,
             direccion       TEXT    NOT NULL,
+            rol             TEXT    NOT NULL DEFAULT 'usuario'
+                            CHECK (rol IN ('usuario', 'admin')),
             fecha_registro  TEXT    NOT NULL
         );
 
@@ -32,6 +35,7 @@ public static class DbInitializer
             color           TEXT    NOT NULL,
             esterilizado    INTEGER NOT NULL CHECK (esterilizado IN (0, 1)),
             observaciones   TEXT    NULL,
+            foto_url        TEXT    NULL,
             user_id         INTEGER NOT NULL,
             fecha_registro  TEXT    NOT NULL,
             CONSTRAINT fk_mascotas_usuarios
@@ -56,10 +60,11 @@ public static class DbInitializer
                 FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE RESTRICT
         );
 
-        CREATE INDEX IF NOT EXISTS ix_mascotas_user_id        ON mascotas(user_id);
-        CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id    ON consultas(mascota_id);
-        CREATE INDEX IF NOT EXISTS ix_consultas_user_id       ON consultas(user_id);
-        CREATE INDEX IF NOT EXISTS ix_consultas_tipo_servicio ON consultas(tipo_servicio);
+        CREATE INDEX IF NOT EXISTS ix_mascotas_user_id              ON mascotas(user_id);
+        CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id          ON consultas(mascota_id);
+        CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id_fecha    ON consultas(mascota_id, fecha_consulta DESC, estado);
+        CREATE INDEX IF NOT EXISTS ix_consultas_user_id             ON consultas(user_id);
+        CREATE INDEX IF NOT EXISTS ix_consultas_tipo_servicio       ON consultas(tipo_servicio);
         """;
 
     public static async Task InitializeAsync(IServiceProvider services)
@@ -92,9 +97,15 @@ public static class DbInitializer
         await db.Database.OpenConnectionAsync();
         try
         {
-            await using var cmd = db.Database.GetDbConnection().CreateCommand();
-            cmd.CommandText = schemaSql;
-            await cmd.ExecuteNonQueryAsync();
+            var conn = db.Database.GetDbConnection();
+            await using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = schemaSql;
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            // Migración segura para bases de datos creadas antes de rol / foto_url / índice compuesto
+            await EnsureSchemaUpgradesAsync(conn);
         }
         finally
         {
@@ -111,6 +122,7 @@ public static class DbInitializer
                 Telefono = "3000000000",
                 Email = "admin@centrocanino.local",
                 Direccion = "Sede Principal",
+                Rol = "admin",
                 FechaRegistro = DateTime.UtcNow
             };
             admin.PasswordHash = passwordHasher.HashPassword(admin, "12345");
@@ -118,5 +130,58 @@ public static class DbInitializer
             db.Usuarios.Add(admin);
             await db.SaveChangesAsync();
         }
+        else if (!await db.Usuarios.AnyAsync(u => u.Rol == "admin"))
+        {
+            // Garantiza que una BD migrada nunca quede sin al menos un administrador
+            var firstAdminCandidate = await db.Usuarios
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == "admin")
+                ?? await db.Usuarios.OrderBy(u => u.Id).FirstAsync();
+
+            firstAdminCandidate.Rol = "admin";
+            await db.SaveChangesAsync();
+        }
+    }
+
+    private static async Task EnsureSchemaUpgradesAsync(DbConnection conn)
+    {
+        if (!await ColumnExistsAsync(conn, "usuarios", "rol"))
+        {
+            await ExecuteNonQueryAsync(conn, """
+                ALTER TABLE usuarios ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario' CHECK (rol IN ('usuario', 'admin'));
+                UPDATE usuarios SET rol = 'admin' WHERE LOWER(username) = 'admin';
+                """);
+        }
+
+        if (!await ColumnExistsAsync(conn, "mascotas", "foto_url"))
+        {
+            await ExecuteNonQueryAsync(conn, "ALTER TABLE mascotas ADD COLUMN foto_url TEXT NULL;");
+        }
+
+        await ExecuteNonQueryAsync(conn, """
+            CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id ON consultas(mascota_id);
+            CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id_fecha ON consultas(mascota_id, fecha_consulta DESC, estado);
+            """);
+    }
+
+    private static async Task<bool> ColumnExistsAsync(DbConnection conn, string tableName, string columnName)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info({tableName});";
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            if (reader.GetString(1).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static async Task ExecuteNonQueryAsync(DbConnection conn, string sql)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        await cmd.ExecuteNonQueryAsync();
     }
 }

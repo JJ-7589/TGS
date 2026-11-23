@@ -10,6 +10,7 @@ public class Usuario
     public string Telefono { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Direccion { get; set; } = string.Empty;
+    public string Rol { get; set; } = "usuario";
     public DateTime FechaRegistro { get; set; }
 
     public ICollection<Mascota> Mascotas { get; set; } = new List<Mascota>();

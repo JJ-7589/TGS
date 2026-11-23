@@ -49,8 +49,11 @@ public sealed class ConsultasController : ControllerBase
 
         DomainValidation.ThrowIfErrors(errors);
 
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        var effectiveUserId = currentUser.IsAdmin ? parsedUserId : currentUser.UserId;
+
         var consultas = await _consultaService.GetAllAsync(
-            parsedUserId,
+            effectiveUserId,
             parsedMascotaId,
             normalizedTipoServicio,
             normalizedEstado);
@@ -81,7 +84,10 @@ public sealed class ConsultasController : ControllerBase
         var normalized = DomainValidation.ValidateTipoServicio(tipoServicio, errors, "tipoServicio");
         DomainValidation.ThrowIfErrors(errors);
 
-        var consultas = await _consultaService.GetByTipoServicioAsync(normalized);
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        int? scopedUserId = currentUser.IsAdmin ? null : currentUser.UserId;
+
+        var consultas = await _consultaService.GetByTipoServicioAsync(normalized, scopedUserId);
         return Ok(consultas);
     }
 
@@ -102,6 +108,12 @@ public sealed class ConsultasController : ControllerBase
             throw new ApiValidationException("El cuerpo JSON de la petición es obligatorio.");
         }
 
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        if (!currentUser.IsAdmin && request.UserId is null)
+        {
+            request.UserId = currentUser.UserId;
+        }
+
         var created = await _consultaService.CreateAsync(request);
         return Created($"/api/consultas/{created.Id}", created);
     }
@@ -114,6 +126,12 @@ public sealed class ConsultasController : ControllerBase
         if (request is null)
         {
             throw new ApiValidationException("El cuerpo JSON de la petición es obligatorio.");
+        }
+
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        if (!currentUser.IsAdmin && request.UserId is null)
+        {
+            request.UserId = currentUser.UserId;
         }
 
         var updated = await _consultaService.UpdateAsync(parsedId, request);

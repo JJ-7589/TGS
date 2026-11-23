@@ -12,6 +12,7 @@ TestResults/
 *.db-wal
 *.db-journal
 **/storage/*.db
+**/storage/uploads/
 
 # Logs y temporales
 *.log

@@ -4,78 +4,54 @@ Sistema full-stack desarrollado en **.NET 10 (ASP.NET Core)** con base de datos 
 
 ## Documentación de la API
 
-Consulta el contrato completo de endpoints, tipos de datos, códigos HTTP, casos de extremo y ejemplos en JavaScript (`fetch`) en:
+Consulta el contrato completo de endpoints, roles, tipos de datos, códigos HTTP, casos de extremo y ejemplos en JavaScript (`fetch`) en:
 
 - **[`API_DOCS.md`](./API_DOCS.md)** — Guía completa de integración para el frontend.
 
-## Estructura del Proyecto
+## Novedades Principales
 
-```text
-├── API_DOCS.md                        # Contrato de API y guía de endpoints
-├── Caninos.sln                        # Solución .NET
-├── database/
-│   └── schema.sql                     # Esquema SQLite (usuarios, mascotas, consultas + FKs e índices)
-├── frontend-caninos/
-│   ├── index.html                     # Interfaz web (Login, Registro, Clientes, Caninos, Consultas)
-│   ├── styles.css                     # Estilos de la aplicación
-│   ├── apiClient.js                   # Cliente HTTP conectado a http://localhost:5150/api
-│   └── app.js                         # Lógica de los módulos del frontend
-├── src/
-│   └── Caninos.Api/                   # Backend ASP.NET Core + SQLite + JWT + Swagger + archivos estáticos
-└── tests/
-    └── Caninos.Api.Tests/             # Batería de pruebas automatizadas (xUnit + WebApplicationFactory)
-```
+- **Roles (`usuario` y `admin`) + Middleware global de permisos (`PermissionsMiddleware`):**
+  - **`admin`**: acceso completo a usuarios, mascotas, consultas y su perfil.
+  - **`usuario`**: gestiona su propio perfil (`/perfil`), sus propias mascotas y sus propias consultas; cualquier intento de acceso a recursos ajenos o rutas de administrador responde `403 Forbidden`.
+- **Página de Perfil (`/perfil`):** permite actualizar datos personales (`PUT /api/perfil`) y cambiar la contraseña numérica (`PUT /api/perfil/password`).
+- **Tarjetas de Mascotas inteligentes con Foto, Próxima Cita e Historial:**
+  - **1 mascota:** se muestra centrada en pantalla en vista destacada con foto, próxima cita y acceso al historial.
+  - **Más de 1 mascota:** se muestra un **Grid View** con foto del animal, próxima cita y campo de historial; al hacer clic en cualquier tarjeta del grid, se abre centrada en pantalla con botón para volver a la cuadrícula.
+  - **Fotos:** soporte para subir imagen real (`POST /api/uploads/mascotas`, JPG/PNG/WEBP máx. 5 MB) o pegar URL (`fotoUrl`).
+  - **Historial indexado:** `GET /api/mascotas/{id}/historial` respaldado por índices `ix_consultas_mascota_id` e `ix_consultas_mascota_id_fecha` en SQLite para acelerar las cargas.
+- **Validación de fecha de citas:** bloquea la programación de citas anteriores a la fecha y hora actual tanto en backend (`400 Bad Request`) como en frontend.
 
 ## Cómo emular / ejecutar el sistema completo en local
 
 ### Requisitos
-- [.NET 10 SDK](https://dotnet.microsoft.com/) (no requiere Node.js ni servidores externos: el backend sirve automáticamente el frontend y crea la base de datos SQLite `storage/caninos.db`).
+- [.NET 10 SDK](https://dotnet.microsoft.com/) (no requiere Node.js ni servidores externos: el backend sirve el frontend y migra/crea automáticamente `storage/caninos.db`).
 
-### Opción 1 (Recomendada): Todo en un solo comando
+### Paso único
 
-Desde la raíz del repositorio (`D:\TGS\TGS`):
+```powershell
+# Si había una instancia previa corriendo, ciérrala primero:
+Stop-Process -Name Caninos.Api -Force -ErrorAction SilentlyContinue
 
-```bash
+# Iniciar Backend + Frontend + SQLite
 dotnet run --project src/Caninos.Api
 ```
-
-Una vez veas `Now listening on: http://localhost:5150`, abre tu navegador en:
 
 | Recurso | URL |
 | :--- | :--- |
 | **Aplicación Web (redirige automáticamente a `/login`)** | `http://localhost:5150` → `http://localhost:5150/login` |
 | **Panel principal (requiere iniciar sesión)** | `http://localhost:5150/dashboard` |
+| **Mi Perfil y cambio de contraseña** | `http://localhost:5150/perfil` |
 | **Documentación interactiva (Swagger UI)** | `http://localhost:5150/swagger` |
 | **Estado del servidor y SQLite (Health)** | `http://localhost:5150/api/health` |
 
 ### Credenciales iniciales (usuario semilla)
-- **Usuario:** `admin`
+- **Usuario:** `admin` (`rol: admin`)
 - **Contraseña numérica:** `12345`
 
-*(También puedes crear nuevas cuentas desde el botón **"Regístrate aquí"** en la pantalla de inicio de sesión).*
-
-### Opción 2 (Opcional): Ejecutar frontend en un puerto separado
-
-Si prefieres levantar `frontend-caninos/` por separado (por ejemplo con la extensión **Live Server** de VS Code o `python -m http.server 5500 --directory frontend-caninos`):
-1. Inicia primero el backend con `dotnet run --project src/Caninos.Api` (puerto `5150`).
-2. Abre el frontend en `http://localhost:5500` (o `http://127.0.0.1:5500`). `apiClient.js` apunta automáticamente a `http://localhost:5150/api` y CORS ya está habilitado para `localhost` y `127.0.0.1`.
-> No abras `index.html` con doble clic (`file://`), porque los navegadores bloquean módulos ES6 (`type="module"`) sin servidor HTTP.
+*(Al registrarte desde **"Regístrate aquí"**, se crea automáticamente una cuenta con rol `usuario` para probar el flujo de cliente con sus propias mascotas).*
 
 ## Ejecutar pruebas automatizadas
 
-```bash
+```powershell
 dotnet test tests/Caninos.Api.Tests/Caninos.Api.Tests.csproj -c Release
 ```
-
-## Resumen de Arquitectura y Validaciones
-
-- **Base de datos:** SQLite (`storage/caninos.db`) con `PRAGMA foreign_keys = ON` en cada conexión y restricciones `CHECK` / `UNIQUE` / `FOREIGN KEY ... ON DELETE RESTRICT`.
-- **Relaciones:**
-  - `usuarios` (1) ── (N) `mascotas` (`mascotas.user_id` → `usuarios.id`)
-  - `mascotas` (1) ── (N) `consultas` (`consultas.mascota_id` → `mascotas.id`)
-  - `consultas` (N) ── (1) `usuarios` (`consultas.user_id` → `usuarios.id`)
-- **Autenticación sin roles:** JWT Bearer emitido por `POST /api/auth/login` o `POST /api/auth/register`. La contraseña se valida estrictamente como numérica de mínimo 5 dígitos (`^\d{5,20}$`) y se guarda hasheada con PBKDF2.
-- **Consultas requeridas:**
-  - Por ID del cliente: `GET /api/consultas/usuario/{userId}` o `GET /api/consultas?userId={userId}`
-  - Por ID del canino: `GET /api/consultas/mascota/{mascotaId}` o `GET /api/consultas?mascotaId={mascotaId}`
-  - Por tipo de servicio: `GET /api/consultas/servicio/{tipoServicio}` o `GET /api/consultas?tipoServicio={tipoServicio}`

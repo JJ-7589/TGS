@@ -15,15 +15,18 @@ public sealed class UsuarioService
     private readonly AppDbContext _db;
     private readonly IPasswordHasher<Usuario> _passwordHasher;
     private readonly JwtTokenService _jwtTokenService;
+    private readonly MascotaService _mascotaService;
 
     public UsuarioService(
         AppDbContext db,
         IPasswordHasher<Usuario> passwordHasher,
-        JwtTokenService jwtTokenService)
+        JwtTokenService jwtTokenService,
+        MascotaService mascotaService)
     {
         _db = db;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _mascotaService = mascotaService;
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -60,7 +63,20 @@ public sealed class UsuarioService
 
     public async Task<AuthResponse> RegisterAsync(CreateUsuarioRequest request)
     {
-        var created = await CreateAsync(request);
+        // El autorregistro siempre crea cuentas con rol 'usuario' (sin escalación de privilegios)
+        var safeRequest = new CreateUsuarioRequest
+        {
+            Username = request.Username,
+            Password = request.Password,
+            Documento = request.Documento,
+            NombreCompleto = request.NombreCompleto,
+            Telefono = request.Telefono,
+            Email = request.Email,
+            Direccion = request.Direccion,
+            Rol = "usuario"
+        };
+
+        var created = await CreateAsync(safeRequest);
         var usuario = await _db.Usuarios.AsNoTracking().FirstAsync(u => u.Id == created.Id);
         var (token, expiresAt) = _jwtTokenService.GenerateToken(usuario);
 
@@ -115,13 +131,7 @@ public sealed class UsuarioService
             throw new ApiNotFoundException($"No se encontró ningún usuario con id {id}.");
         }
 
-        return await _db.Mascotas
-            .AsNoTracking()
-            .Include(m => m.Usuario)
-            .Where(m => m.UserId == id)
-            .OrderBy(m => m.Id)
-            .Select(m => MascotaService.ToResponse(m))
-            .ToListAsync();
+        return await _mascotaService.GetAllAsync(id);
     }
 
     public async Task<UsuarioResponse> CreateAsync(CreateUsuarioRequest request)
@@ -134,6 +144,7 @@ public sealed class UsuarioService
         var telefono = DomainValidation.ValidateTelefono(request.Telefono, errors);
         var email = DomainValidation.ValidateEmail(request.Email, errors);
         var direccion = DomainValidation.ValidateRequiredText(request.Direccion, "direccion", "direccion", 5, 200, errors);
+        var rol = DomainValidation.ValidateRol(request.Rol, required: false, errors) ?? "usuario";
         DomainValidation.ThrowIfErrors(errors);
 
         await EnsureUniqueFieldsAsync(username, documento, email, excludeUserId: null);
@@ -146,6 +157,7 @@ public sealed class UsuarioService
             Telefono = telefono,
             Email = email,
             Direccion = direccion,
+            Rol = rol,
             FechaRegistro = DateTime.UtcNow
         };
         usuario.PasswordHash = _passwordHasher.HashPassword(usuario, password);
@@ -156,7 +168,7 @@ public sealed class UsuarioService
         return ToResponse(usuario);
     }
 
-    public async Task<UsuarioResponse> UpdateAsync(int id, UpdateUsuarioRequest request)
+    public async Task<UsuarioResponse> UpdateAsync(int id, UpdateUsuarioRequest request, bool allowRoleChange = true)
     {
         var usuario = await _db.Usuarios.FirstOrDefaultAsync(u => u.Id == id)
             ?? throw new ApiNotFoundException($"No se encontró ningún usuario con id {id}.");
@@ -169,6 +181,7 @@ public sealed class UsuarioService
         var telefono = DomainValidation.ValidateTelefono(request.Telefono, errors);
         var email = DomainValidation.ValidateEmail(request.Email, errors);
         var direccion = DomainValidation.ValidateRequiredText(request.Direccion, "direccion", "direccion", 5, 200, errors);
+        var rol = DomainValidation.ValidateRol(request.Rol, required: false, errors);
         DomainValidation.ThrowIfErrors(errors);
 
         await EnsureUniqueFieldsAsync(username, documento, email, excludeUserId: id);
@@ -180,6 +193,11 @@ public sealed class UsuarioService
         usuario.Email = email;
         usuario.Direccion = direccion;
 
+        if (allowRoleChange && rol is not null)
+        {
+            usuario.Rol = rol;
+        }
+
         if (password is not null)
         {
             usuario.PasswordHash = _passwordHasher.HashPassword(usuario, password);
@@ -187,6 +205,64 @@ public sealed class UsuarioService
 
         await _db.SaveChangesAsync();
         return ToResponse(usuario);
+    }
+
+    public async Task<UsuarioResponse> UpdatePerfilAsync(int currentUserId, UpdatePerfilRequest request)
+    {
+        var usuario = await _db.Usuarios.FirstOrDefaultAsync(u => u.Id == currentUserId)
+            ?? throw new ApiNotFoundException($"No se encontró ningún usuario con id {currentUserId}.");
+
+        var errors = new Dictionary<string, List<string>>();
+        var username = DomainValidation.ValidateUsername(request.Username, errors);
+        var documento = DomainValidation.ValidateDocumento(request.Documento, errors);
+        var nombreCompleto = DomainValidation.ValidateNombreCompleto(request.NombreCompleto, errors);
+        var telefono = DomainValidation.ValidateTelefono(request.Telefono, errors);
+        var email = DomainValidation.ValidateEmail(request.Email, errors);
+        var direccion = DomainValidation.ValidateRequiredText(request.Direccion, "direccion", "direccion", 5, 200, errors);
+        DomainValidation.ThrowIfErrors(errors);
+
+        await EnsureUniqueFieldsAsync(username, documento, email, excludeUserId: currentUserId);
+
+        usuario.Username = username;
+        usuario.Documento = documento;
+        usuario.NombreCompleto = nombreCompleto;
+        usuario.Telefono = telefono;
+        usuario.Email = email;
+        usuario.Direccion = direccion;
+
+        await _db.SaveChangesAsync();
+        return ToResponse(usuario);
+    }
+
+    public async Task ChangePasswordAsync(int currentUserId, ChangePasswordRequest request)
+    {
+        var usuario = await _db.Usuarios.FirstOrDefaultAsync(u => u.Id == currentUserId)
+            ?? throw new ApiNotFoundException($"No se encontró ningún usuario con id {currentUserId}.");
+
+        var errors = new Dictionary<string, List<string>>();
+        var passwordActual = DomainValidation.ValidatePassword(request.PasswordActual, required: true, errors, "passwordActual")!;
+        var passwordNueva = DomainValidation.ValidatePassword(request.PasswordNueva, required: true, errors, "passwordNueva")!;
+        var confirmarPassword = DomainValidation.ValidatePassword(request.ConfirmarPassword, required: true, errors, "confirmarPassword")!;
+        DomainValidation.ThrowIfErrors(errors);
+
+        var verification = _passwordHasher.VerifyHashedPassword(usuario, usuario.PasswordHash, passwordActual);
+        if (verification == PasswordVerificationResult.Failed)
+        {
+            throw ApiValidationException.Single("passwordActual", "La contraseña actual es incorrecta.");
+        }
+
+        if (!string.Equals(passwordNueva, confirmarPassword, StringComparison.Ordinal))
+        {
+            throw ApiValidationException.Single("confirmarPassword", "La confirmación no coincide con la nueva contraseña.");
+        }
+
+        if (string.Equals(passwordActual, passwordNueva, StringComparison.Ordinal))
+        {
+            throw ApiValidationException.Single("passwordNueva", "La nueva contraseña debe ser diferente a la contraseña actual.");
+        }
+
+        usuario.PasswordHash = _passwordHasher.HashPassword(usuario, passwordNueva);
+        await _db.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(int id)
@@ -252,6 +328,7 @@ public sealed class UsuarioService
         Telefono = usuario.Telefono,
         Email = usuario.Email,
         Direccion = usuario.Direccion,
+        Rol = usuario.Rol,
         FechaRegistro = usuario.FechaRegistro
     };
 }

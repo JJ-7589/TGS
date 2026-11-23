@@ -29,11 +29,11 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
         .AddInterceptors(sp.GetRequiredService<SqliteForeignKeysInterceptor>());
 });
 
-// Servicios de dominio y seguridad (sin roles)
+// Servicios de dominio y seguridad (roles 'usuario' y 'admin')
 builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 builder.Services.AddSingleton<JwtTokenService>();
-builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<MascotaService>();
+builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<ConsultaService>();
 
 // Controladores con serialización JSON estricta y formato uniforme de errores 400
@@ -89,7 +89,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-// Autenticación JWT Bearer (sin roles)
+// Autenticación JWT Bearer con soporte de roles ('usuario', 'admin')
 var jwtSecret = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException("Falta configurar Jwt:SecretKey.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Caninos.Api";
@@ -109,7 +109,8 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
+            ClockSkew = TimeSpan.FromSeconds(30),
+            RoleClaimType = "role"
         };
 
         options.Events = new JwtBearerEvents
@@ -126,6 +127,15 @@ builder.Services
                     StatusCodes.Status401Unauthorized,
                     "Unauthorized",
                     message,
+                    new());
+            },
+            OnForbidden = async context =>
+            {
+                await ErrorHandlingMiddleware.WriteErrorAsync(
+                    context.HttpContext,
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    "No tienes permisos para realizar esta acción.",
                     new());
             }
         };
@@ -155,7 +165,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Sistema de Registro de Caninos API",
         Version = "v1",
-        Description = "API REST en .NET + SQLite para gestión de usuarios, mascotas y consultas de salud, estética y recreación."
+        Description = "API REST en .NET + SQLite con roles (usuario/admin), middleware global de permisos, fotos de mascotas, próxima cita e historial indexado."
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -176,7 +186,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Inicializar esquema SQLite y usuario semilla inicial
+// Inicializar esquema SQLite, migraciones incrementales y usuario admin inicial
 await DbInitializer.InitializeAsync(app.Services);
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
@@ -186,6 +196,15 @@ app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Caninos API v1");
     options.RoutePrefix = "swagger";
+});
+
+// Carpeta pública de fotos subidas (/uploads/mascotas/...)
+var uploadsRoot = Path.Combine(app.Environment.ContentRootPath, "storage", "uploads");
+Directory.CreateDirectory(uploadsRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsRoot),
+    RequestPath = "/uploads"
 });
 
 // Servir el frontend (frontend-caninos) directamente desde http://localhost:5150/
@@ -207,6 +226,7 @@ if (frontendDir is not null)
 app.UseCors("FrontendLocal");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<PermissionsMiddleware>();
 
 app.MapControllers();
 
@@ -218,6 +238,7 @@ if (frontendDir is not null)
     app.MapGet("/login", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
     app.MapGet("/registro", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
     app.MapGet("/dashboard", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
+    app.MapGet("/perfil", () => Results.File(indexHtmlPath, "text/html; charset=utf-8")).ExcludeFromDescription();
 }
 
 app.Run();
