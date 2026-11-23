@@ -1,6 +1,5 @@
 import {
   apiRequest,
-  checkBackendHealth,
   uploadMascotaPhoto,
   resolveAssetUrl,
   getToken,
@@ -47,7 +46,6 @@ const currentRoleBadge = document.getElementById("current-role-badge");
 const btnOpenPerfil = document.getElementById("btn-open-perfil");
 const btnBackDashboard = document.getElementById("btn-back-dashboard");
 const btnLogout = document.getElementById("btn-logout");
-const backendStatusEl = document.getElementById("backend-status");
 
 // Pestañas
 const tabButtons = document.querySelectorAll(".tab-btn");
@@ -241,18 +239,6 @@ btnToggleAuth.addEventListener("click", toggleAuthMode);
 
 let sessionExpiredHandled = false;
 
-async function refreshBackendStatus() {
-  if (!backendStatusEl) return;
-  try {
-    await checkBackendHealth();
-    backendStatusEl.textContent = "🟢 Backend y SQLite conectados";
-    backendStatusEl.className = "status-pill status-online";
-  } catch {
-    backendStatusEl.textContent = "🔴 Backend desconectado (inicia el servidor en puerto 5150)";
-    backendStatusEl.className = "status-pill status-offline";
-  }
-}
-
 function setActiveTab(targetTab) {
   tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === targetTab));
   tabPanels.forEach((panel) => {
@@ -350,7 +336,6 @@ function showAuth({ register = false, replaceUrl = true } = {}) {
   registerForm.reset();
   applyAuthMode(register, { syncUrl: false });
   navigatePath(register ? "/registro" : "/login", { replace: replaceUrl });
-  refreshBackendStatus();
 }
 
 window.addEventListener("popstate", () => {
@@ -537,9 +522,6 @@ function closeModal() {
 }
 
 btnCloseModal.addEventListener("click", closeModal);
-modalOverlay.addEventListener("click", (e) => {
-  if (e.target === modalOverlay) closeModal();
-});
 
 // ==================== SELECTORES AUXILIARES ====================
 function populateClienteSelects() {

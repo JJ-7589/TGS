@@ -130,6 +130,16 @@ public static class DbInitializer
             db.Usuarios.Add(admin);
             await db.SaveChangesAsync();
         }
+        else if (!await db.Usuarios.AnyAsync(u => u.Rol == "admin"))
+        {
+            // Garantiza que una BD migrada nunca quede sin al menos un administrador
+            var firstAdminCandidate = await db.Usuarios
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == "admin")
+                ?? await db.Usuarios.OrderBy(u => u.Id).FirstAsync();
+
+            firstAdminCandidate.Rol = "admin";
+            await db.SaveChangesAsync();
+        }
     }
 
     private static async Task EnsureSchemaUpgradesAsync(DbConnection conn)
