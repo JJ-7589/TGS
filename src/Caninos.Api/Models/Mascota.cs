@@ -11,6 +11,7 @@ public class Mascota
     public string Color { get; set; } = string.Empty;
     public bool Esterilizado { get; set; }
     public string? Observaciones { get; set; }
+    public string? FotoUrl { get; set; }
     public int UserId { get; set; }
     public DateTime FechaRegistro { get; set; }
 

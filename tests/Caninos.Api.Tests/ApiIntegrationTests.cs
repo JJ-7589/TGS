@@ -111,7 +111,8 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
         Assert.Equal("admin", auth.Usuario.Username);
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.Token);
-        Assert.DoesNotContain(jwt.Claims, c => c.Type.Contains("role", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(jwt.Claims, c => c.Type == "role" && c.Value == "admin");
+        Assert.Equal("admin", auth.Usuario.Rol);
     }
 
     [Theory]

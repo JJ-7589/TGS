@@ -38,6 +38,9 @@ public sealed class ErrorHandlingMiddleware
                     StatusCodes.Status401Unauthorized => (
                         "Unauthorized",
                         "No autorizado. Debes proporcionar un token Bearer válido."),
+                    StatusCodes.Status403Forbidden => (
+                        "Forbidden",
+                        "No tienes permisos para realizar esta acción."),
                     StatusCodes.Status404NotFound => (
                         "Not Found",
                         "La ruta o recurso solicitado no existe."),

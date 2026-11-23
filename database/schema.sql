@@ -5,7 +5,7 @@
 --   - usuarios (1) -> mascotas (N)   [mascotas.user_id -> usuarios.id]
 --   - mascotas (1) -> consultas (N)  [consultas.mascota_id -> mascotas.id]
 --   - consultas (N) -> usuarios (1)  [consultas.user_id -> usuarios.id]
--- Sin tabla ni columna de roles.
+-- Roles soportados: 'usuario', 'admin'
 -- ============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
     telefono        TEXT    NOT NULL,
     email           TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     direccion       TEXT    NOT NULL,
+    rol             TEXT    NOT NULL DEFAULT 'usuario'
+                    CHECK (rol IN ('usuario', 'admin')),
     fecha_registro  TEXT    NOT NULL
 );
 
@@ -32,6 +34,7 @@ CREATE TABLE IF NOT EXISTS mascotas (
     color           TEXT    NOT NULL,
     esterilizado    INTEGER NOT NULL CHECK (esterilizado IN (0, 1)),
     observaciones   TEXT    NULL,
+    foto_url        TEXT    NULL,
     user_id         INTEGER NOT NULL,
     fecha_registro  TEXT    NOT NULL,
     CONSTRAINT fk_mascotas_usuarios
@@ -56,7 +59,8 @@ CREATE TABLE IF NOT EXISTS consultas (
         FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS ix_mascotas_user_id        ON mascotas(user_id);
-CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id    ON consultas(mascota_id);
-CREATE INDEX IF NOT EXISTS ix_consultas_user_id       ON consultas(user_id);
-CREATE INDEX IF NOT EXISTS ix_consultas_tipo_servicio ON consultas(tipo_servicio);
+CREATE INDEX IF NOT EXISTS ix_mascotas_user_id              ON mascotas(user_id);
+CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id          ON consultas(mascota_id);
+CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id_fecha    ON consultas(mascota_id, fecha_consulta DESC, estado);
+CREATE INDEX IF NOT EXISTS ix_consultas_user_id             ON consultas(user_id);
+CREATE INDEX IF NOT EXISTS ix_consultas_tipo_servicio       ON consultas(tipo_servicio);

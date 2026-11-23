@@ -32,7 +32,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Usuario>(entity =>
         {
-            entity.ToTable("usuarios");
+            entity.ToTable("usuarios", table =>
+            {
+                table.HasCheckConstraint("ck_usuarios_rol", "rol IN ('usuario', 'admin')");
+            });
             entity.HasKey(u => u.Id);
 
             entity.Property(u => u.Id).HasColumnName("id").ValueGeneratedOnAdd();
@@ -43,6 +46,7 @@ public class AppDbContext : DbContext
             entity.Property(u => u.Telefono).HasColumnName("telefono").IsRequired().HasMaxLength(20);
             entity.Property(u => u.Email).HasColumnName("email").IsRequired().HasMaxLength(150).UseCollation("NOCASE");
             entity.Property(u => u.Direccion).HasColumnName("direccion").IsRequired().HasMaxLength(200);
+            entity.Property(u => u.Rol).HasColumnName("rol").IsRequired().HasMaxLength(20).HasDefaultValue("usuario");
             entity.Property(u => u.FechaRegistro).HasColumnName("fecha_registro").IsRequired().HasConversion(utcDateTimeConverter);
 
             entity.HasIndex(u => u.Username).IsUnique();
@@ -70,6 +74,7 @@ public class AppDbContext : DbContext
             entity.Property(m => m.Color).HasColumnName("color").IsRequired().HasMaxLength(50);
             entity.Property(m => m.Esterilizado).HasColumnName("esterilizado").IsRequired();
             entity.Property(m => m.Observaciones).HasColumnName("observaciones").HasMaxLength(500);
+            entity.Property(m => m.FotoUrl).HasColumnName("foto_url").HasMaxLength(500);
             entity.Property(m => m.UserId).HasColumnName("user_id").IsRequired();
             entity.Property(m => m.FechaRegistro).HasColumnName("fecha_registro").IsRequired().HasConversion(utcDateTimeConverter);
 
@@ -104,6 +109,7 @@ public class AppDbContext : DbContext
             entity.Property(c => c.FechaCreacion).HasColumnName("fecha_creacion").IsRequired().HasConversion(utcDateTimeConverter);
 
             entity.HasIndex(c => c.MascotaId).HasDatabaseName("ix_consultas_mascota_id");
+            entity.HasIndex(c => new { c.MascotaId, c.FechaConsulta, c.Estado }).HasDatabaseName("ix_consultas_mascota_id_fecha");
             entity.HasIndex(c => c.UserId).HasDatabaseName("ix_consultas_user_id");
             entity.HasIndex(c => c.TipoServicio).HasDatabaseName("ix_consultas_tipo_servicio");
 

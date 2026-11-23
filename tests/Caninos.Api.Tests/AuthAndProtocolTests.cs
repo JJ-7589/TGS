@@ -79,6 +79,7 @@ public sealed class AuthAndProtocolTests : IClassFixture<CustomWebApplicationFac
     [InlineData("/login", "Iniciar Sesión")]
     [InlineData("/registro", "Crear Cuenta")]
     [InlineData("/dashboard", "Centro Canino")]
+    [InlineData("/perfil", "Mi Perfil y Seguridad")]
     [InlineData("/apiClient.js", "API_BASE_URL")]
     [InlineData("/app.js", "showDashboard")]
     [InlineData("/styles.css", "--primary")]
@@ -108,7 +109,8 @@ public sealed class AuthAndProtocolTests : IClassFixture<CustomWebApplicationFac
         Assert.True(auth.ExpiresAt > DateTime.UtcNow);
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.Token);
-        Assert.DoesNotContain(jwt.Claims, c => c.Type.Contains("role", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(jwt.Claims, c => c.Type == "role" && c.Value == "admin");
+        Assert.Equal("admin", auth.Usuario.Rol);
     }
 
     [Theory]

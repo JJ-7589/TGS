@@ -89,9 +89,9 @@ public sealed class ConsultaService
         return await GetAllAsync(userId: null, mascotaId, tipoServicio: null, estado: null);
     }
 
-    public async Task<List<ConsultaResponse>> GetByTipoServicioAsync(string tipoServicioNormalizado)
+    public async Task<List<ConsultaResponse>> GetByTipoServicioAsync(string tipoServicioNormalizado, int? scopedUserId = null)
     {
-        return await GetAllAsync(userId: null, mascotaId: null, tipoServicioNormalizado, estado: null);
+        return await GetAllAsync(userId: scopedUserId, mascotaId: null, tipoServicioNormalizado, estado: null);
     }
 
     public async Task<ConsultaResponse> CreateAsync(CreateConsultaRequest request)
@@ -101,7 +101,8 @@ public sealed class ConsultaService
         var mascotaId = DomainValidation.ValidateForeignKeyId(request.MascotaId, "mascotaId", errors);
         var tipoServicio = DomainValidation.ValidateTipoServicio(request.TipoServicio, errors);
         var descripcion = DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
-        var fechaConsulta = DomainValidation.ValidateFechaConsulta(request.FechaConsulta, errors);
+        // No se permite programar citas nuevas antes de la fecha/hora actual
+        var fechaConsulta = DomainValidation.ValidateFechaConsulta(request.FechaConsulta, errors, disallowPast: true);
         var costo = DomainValidation.ValidateCosto(request.Costo, errors);
         var estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: false, errors);
         var observaciones = DomainValidation.ValidateOptionalText(request.Observaciones, "observaciones", "observaciones", 500, errors);
@@ -140,9 +141,11 @@ public sealed class ConsultaService
         var mascotaId = DomainValidation.ValidateForeignKeyId(request.MascotaId, "mascotaId", errors);
         var tipoServicio = DomainValidation.ValidateTipoServicio(request.TipoServicio, errors);
         var descripcion = DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
-        var fechaConsulta = DomainValidation.ValidateFechaConsulta(request.FechaConsulta, errors);
-        var costo = DomainValidation.ValidateCosto(request.Costo, errors);
         var estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: true, errors);
+        // Si se reprograma o mantiene como Programada, no puede quedar en el pasado
+        var disallowPast = estado == "Programada";
+        var fechaConsulta = DomainValidation.ValidateFechaConsulta(request.FechaConsulta, errors, disallowPast);
+        var costo = DomainValidation.ValidateCosto(request.Costo, errors);
         var observaciones = DomainValidation.ValidateOptionalText(request.Observaciones, "observaciones", "observaciones", 500, errors);
         DomainValidation.ThrowIfErrors(errors);
 

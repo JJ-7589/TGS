@@ -27,7 +27,10 @@ public sealed class MascotasController : ControllerBase
         var parsedUserId = DomainValidation.ParseOptionalPositiveId(rawUserId, "userId", errors);
         DomainValidation.ThrowIfErrors(errors);
 
-        var mascotas = await _mascotaService.GetAllAsync(parsedUserId);
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        var effectiveUserId = currentUser.IsAdmin ? parsedUserId : currentUser.UserId;
+
+        var mascotas = await _mascotaService.GetAllAsync(effectiveUserId);
         return Ok(mascotas);
     }
 
@@ -39,6 +42,14 @@ public sealed class MascotasController : ControllerBase
         return Ok(mascota);
     }
 
+    [HttpGet("{id}/historial")]
+    public async Task<ActionResult<MascotaHistorialResponse>> GetHistorial(string id)
+    {
+        var parsedId = DomainValidation.ParsePositiveId(id, "id");
+        var historial = await _mascotaService.GetHistorialAsync(parsedId);
+        return Ok(historial);
+    }
+
     [HttpPost]
     [Consumes("application/json")]
     public async Task<ActionResult<MascotaResponse>> Create([FromBody] CreateMascotaRequest? request)
@@ -46,6 +57,12 @@ public sealed class MascotasController : ControllerBase
         if (request is null)
         {
             throw new ApiValidationException("El cuerpo JSON de la petición es obligatorio.");
+        }
+
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        if (!currentUser.IsAdmin && request.UserId is null)
+        {
+            request.UserId = currentUser.UserId;
         }
 
         var created = await _mascotaService.CreateAsync(request);
@@ -60,6 +77,12 @@ public sealed class MascotasController : ControllerBase
         if (request is null)
         {
             throw new ApiValidationException("El cuerpo JSON de la petición es obligatorio.");
+        }
+
+        var currentUser = HttpContext.GetRequiredCurrentUser();
+        if (!currentUser.IsAdmin && request.UserId is null)
+        {
+            request.UserId = currentUser.UserId;
         }
 
         var updated = await _mascotaService.UpdateAsync(parsedId, request);

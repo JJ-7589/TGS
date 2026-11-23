@@ -6,6 +6,7 @@ namespace Caninos.Api.Validation;
 
 public static partial class DomainValidation
 {
+    public static readonly IReadOnlyList<string> RolesPermitidos = ["usuario", "admin"];
     public static readonly IReadOnlyList<string> TiposServicioPermitidos = ["Salud", "Estetica", "Recreacion"];
     public static readonly IReadOnlyList<string> EstadosConsultaPermitidos = ["Programada", "EnProceso", "Completada", "Cancelada"];
     public static readonly IReadOnlyList<string> SexosPermitidos = ["Macho", "Hembra"];
@@ -102,7 +103,11 @@ public static partial class DomainValidation
         return trimmed.ToLowerInvariant();
     }
 
-    public static string? ValidatePassword(string? value, bool required, Dictionary<string, List<string>> errors)
+    public static string? ValidatePassword(
+        string? value,
+        bool required,
+        Dictionary<string, List<string>> errors,
+        string field = "password")
     {
         if (!required && value is null)
         {
@@ -111,16 +116,39 @@ public static partial class DomainValidation
 
         if (value is null || value.Length == 0)
         {
-            AddError(errors, "password", "La contraseña es obligatoria y debe ser numérica de mínimo 5 dígitos.");
+            AddError(errors, field, "La contraseña es obligatoria y debe ser numérica de mínimo 5 dígitos.");
             return string.Empty;
         }
 
         if (!NumericPasswordRegex().IsMatch(value))
         {
-            AddError(errors, "password", "La contraseña debe ser estrictamente numérica (solo dígitos 0-9, sin espacios ni símbolos) y tener entre 5 y 20 dígitos.");
+            AddError(errors, field, "La contraseña debe ser estrictamente numérica (solo dígitos 0-9, sin espacios ni símbolos) y tener entre 5 y 20 dígitos.");
         }
 
         return value;
+    }
+
+    public static string? ValidateRol(string? value, bool required, Dictionary<string, List<string>> errors)
+    {
+        if (!required && value is null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            AddError(errors, "rol", "El campo 'rol' solo acepta los valores 'usuario' o 'admin'.");
+            return null;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized is "usuario" or "admin")
+        {
+            return normalized;
+        }
+
+        AddError(errors, "rol", "El campo 'rol' solo acepta los valores 'usuario' o 'admin'.");
+        return null;
     }
 
     public static string ValidateDocumento(string? value, Dictionary<string, List<string>> errors)
@@ -265,6 +293,52 @@ public static partial class DomainValidation
         }
 
         return trimmed;
+    }
+
+    public static string? ValidateFotoUrl(string? value, Dictionary<string, List<string>> errors)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        if (trimmed.Length > 500)
+        {
+            AddError(errors, "fotoUrl", "El campo 'fotoUrl' no puede superar los 500 caracteres.");
+            return null;
+        }
+
+        if (ContainsControlChars(trimmed) || trimmed.Any(char.IsWhiteSpace))
+        {
+            AddError(errors, "fotoUrl", "El campo 'fotoUrl' no puede contener espacios ni caracteres de control.");
+            return null;
+        }
+
+        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (trimmed.Contains("..", StringComparison.Ordinal))
+            {
+                AddError(errors, "fotoUrl", "La ruta de la foto no es válida.");
+                return null;
+            }
+            return trimmed;
+        }
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) &&
+            (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+             uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)))
+        {
+            return trimmed;
+        }
+
+        AddError(errors, "fotoUrl", "El campo 'fotoUrl' debe ser una URL válida (http://, https://) o una imagen subida (/uploads/...).");
+        return null;
     }
 
     public static int ValidateEdad(int? value, Dictionary<string, List<string>> errors)
@@ -429,7 +503,10 @@ public static partial class DomainValidation
         };
     }
 
-    public static DateTime ValidateFechaConsulta(DateTime? value, Dictionary<string, List<string>> errors)
+    public static DateTime ValidateFechaConsulta(
+        DateTime? value,
+        Dictionary<string, List<string>> errors,
+        bool disallowPast = false)
     {
         if (value is null)
         {
@@ -447,6 +524,12 @@ public static partial class DomainValidation
         if (utc.Year < 2000 || utc.Year > 2100)
         {
             AddError(errors, "fechaConsulta", "El campo 'fechaConsulta' debe estar comprendido entre los años 2000 y 2100.");
+            return utc;
+        }
+
+        if (disallowPast && utc < DateTime.UtcNow)
+        {
+            AddError(errors, "fechaConsulta", "No se puede programar una cita antes de la fecha y hora actual.");
         }
 
         return utc;

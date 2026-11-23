@@ -9,6 +9,14 @@ export const API_ORIGIN =
 
 export const API_BASE_URL = `${API_ORIGIN}/api`;
 
+export function resolveAssetUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  return `${API_ORIGIN}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
 export function getToken() {
   return localStorage.getItem("caninos_token");
 }
@@ -38,6 +46,47 @@ export function clearSession() {
 
 export async function checkBackendHealth() {
   return apiRequest("/health", { method: "GET", auth: false });
+}
+
+export async function uploadMascotaPhoto(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers = {};
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/uploads/mascotas`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+  } catch {
+    const networkErr = new Error(
+      `No se pudo conectar con el servidor (${API_ORIGIN}). Verifica que el backend esté ejecutándose.`
+    );
+    networkErr.status = 0;
+    networkErr.errors = {};
+    throw networkErr;
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearSession();
+      window.dispatchEvent(new Event("session-expired"));
+    }
+    const error = new Error(data?.message || `Error HTTP ${response.status}`);
+    error.status = response.status;
+    error.errors = data?.errors || {};
+    throw error;
+  }
+
+  return data;
 }
 
 /**

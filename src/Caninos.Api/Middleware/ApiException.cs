@@ -49,6 +49,14 @@ public sealed class ApiUnauthorizedException : ApiException
     }
 }
 
+public sealed class ApiForbiddenException : ApiException
+{
+    public ApiForbiddenException(string message)
+        : base(StatusCodes.Status403Forbidden, "Forbidden", message)
+    {
+    }
+}
+
 public sealed class ApiNotFoundException : ApiException
 {
     public ApiNotFoundException(string message)

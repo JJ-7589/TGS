@@ -29,12 +29,12 @@ public sealed class JwtTokenService
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
-        // Sin roles: solo identidad del usuario autenticado
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, usuario.Username),
             new Claim(JwtRegisteredClaimNames.Email, usuario.Email),
+            new Claim("role", usuario.Rol),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
