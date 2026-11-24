@@ -23,10 +23,13 @@ Consulta el contrato completo de endpoints, roles, tipos de datos, códigos HTTP
 
 ## Cómo emular / ejecutar el sistema completo en local
 
-### Requisitos
-- [.NET 10 SDK](https://dotnet.microsoft.com/) (no requiere Node.js ni servidores externos: el backend sirve el frontend y migra/crea automáticamente `storage/caninos.db`).
+### Opción A — Sin instalar .NET (Ejecutable listo para Windows x64)
+Abre la carpeta `publish-win/` y haz doble clic en:
+- **[`publish-win/Iniciar-CentroCanino.bat`](./publish-win/Iniciar-CentroCanino.bat)** *(inicia el servidor y abre automáticamente `http://localhost:5150/login` en tu navegador)*, o directamente en `publish-win/Caninos.Api.exe`.
 
-### Paso único
+> El ejecutable es autocontenido (*self-contained*), no requiere instalar .NET, ni SQLite, ni Node.js. Al abrirlo por primera vez crea automáticamente `publish-win/storage/caninos.db` con el usuario administrador inicial (`admin` / `12345`).
+
+### Opción B — Desde el código fuente (requiere .NET 10 SDK)
 
 ```powershell
 # Si había una instancia previa corriendo, ciérrala primero:

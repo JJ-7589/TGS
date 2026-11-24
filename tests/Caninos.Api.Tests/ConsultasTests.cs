@@ -26,9 +26,9 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
         var m2 = await TestHelpers.CreateSampleMascotaAsync(client, u2.Id, "Mia", "Poodle");
         var mEmpty = await TestHelpers.CreateSampleMascotaAsync(client, uEmpty.Id, "Nube", "Husky");
 
-        var c1 = await TestHelpers.CreateSampleConsultaAsync(client, u1.Id, m1.Id, "Salud", "Programada", "2026-11-24T08:00:00Z", 60000m);
-        var c2 = await TestHelpers.CreateSampleConsultaAsync(client, u1.Id, m1.Id, "Estética", "EnProceso", "2026-11-26T15:00:00Z", 40000m);
-        var c3 = await TestHelpers.CreateSampleConsultaAsync(client, u2.Id, m2.Id, "Recreación", "Completada", "2026-11-28T11:00:00Z", 35000m);
+        var c1 = await TestHelpers.CreateSampleConsultaAsync(client, u1.Id, m1.Id, "Salud", "Programada", TestHelpers.FutureIso(2), 60000m);
+        var c2 = await TestHelpers.CreateSampleConsultaAsync(client, u1.Id, m1.Id, "Estética", "EnProceso", TestHelpers.FutureIso(4), 40000m);
+        var c3 = await TestHelpers.CreateSampleConsultaAsync(client, u2.Id, m2.Id, "Recreación", "Completada", TestHelpers.FutureIso(6), 35000m);
 
         // Orden descendente por fechaConsulta
         var byU1 = await client.GetFromJsonAsync<List<ConsultaResponse>>($"/api/consultas?userId={u1.Id}", TestHelpers.JsonOptions);
@@ -240,7 +240,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m.Id,
             tipoServicio = "salud",
             descripcion = "Revisión preventiva gratuita",
-            fechaConsulta = "2026-11-25",
+            fechaConsulta = TestHelpers.FutureDateOnly(3),
             costo = 0m
         });
         Assert.Equal(HttpStatusCode.Created, r1.StatusCode);
@@ -257,7 +257,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m.Id,
             tipoServicio = "Estética",
             descripcion = "Paquete spa premium anual",
-            fechaConsulta = "2026-12-01T16:30:00Z",
+            fechaConsulta = TestHelpers.FutureIso(10),
             costo = 100000000m,
             estado = "cancelada",
             observaciones = "   "
@@ -271,20 +271,20 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Theory]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Costo negativo","fechaConsulta":"2026-11-25T10:00:00Z","costo":-0.01}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Costo excesivo","fechaConsulta":"2026-11-25T10:00:00Z","costo":100000000.01}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Tres decimales","fechaConsulta":"2026-11-25T10:00:00Z","costo":50.123}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Costo como texto","fechaConsulta":"2026-11-25T10:00:00Z","costo":"50000"}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Invalido","descripcion":"Servicio inválido","fechaConsulta":"2026-11-25T10:00:00Z","costo":100}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Estado inválido","fechaConsulta":"2026-11-25T10:00:00Z","costo":100,"estado":"Pendiente"}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Estado vacío","fechaConsulta":"2026-11-25T10:00:00Z","costo":100,"estado":""}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"abcd","fechaConsulta":"2026-11-25T10:00:00Z","costo":100}""")]
-    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"     ","fechaConsulta":"2026-11-25T10:00:00Z","costo":100}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Costo negativo","fechaConsulta":"2099-05-15T10:00:00Z","costo":-0.01}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Costo excesivo","fechaConsulta":"2099-05-15T10:00:00Z","costo":100000000.01}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Tres decimales","fechaConsulta":"2099-05-15T10:00:00Z","costo":50.123}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Costo como texto","fechaConsulta":"2099-05-15T10:00:00Z","costo":"50000"}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Invalido","descripcion":"Servicio inválido","fechaConsulta":"2099-05-15T10:00:00Z","costo":100}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Estado inválido","fechaConsulta":"2099-05-15T10:00:00Z","costo":100,"estado":"Pendiente"}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Estado vacío","fechaConsulta":"2099-05-15T10:00:00Z","costo":100,"estado":""}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"abcd","fechaConsulta":"2099-05-15T10:00:00Z","costo":100}""")]
+    [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"     ","fechaConsulta":"2099-05-15T10:00:00Z","costo":100}""")]
     [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Fecha inválida","fechaConsulta":"no-es-fecha","costo":100}""")]
     [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Fecha numérica","fechaConsulta":20261125,"costo":100}""")]
     [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Año anterior a 2000","fechaConsulta":"1999-12-31T23:59:59Z","costo":100}""")]
     [InlineData("""{"userId":1,"mascotaId":1,"tipoServicio":"Salud","descripcion":"Año posterior a 2100","fechaConsulta":"2101-01-01T00:00:00Z","costo":100}""")]
-    [InlineData("""{"userId":0,"mascotaId":-1,"tipoServicio":"Salud","descripcion":"IDs inválidos","fechaConsulta":"2026-11-25T10:00:00Z","costo":100}""")]
+    [InlineData("""{"userId":0,"mascotaId":-1,"tipoServicio":"Salud","descripcion":"IDs inválidos","fechaConsulta":"2099-05-15T10:00:00Z","costo":100}""")]
     [InlineData("""{}""")]
     [InlineData("""{"userId": """)]
     public async Task Create_InvalidDataTypesOrRanges_Returns400(string rawJson)
@@ -312,7 +312,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
                 mascotaId = m.Id,
                 tipoServicio = "Salud",
                 descripcion = "Consulta con usuario inexistente",
-                fechaConsulta = "2026-11-25T10:00:00Z",
+                fechaConsulta = "2099-05-15T10:00:00Z",
                 costo = 10000
             });
             await TestHelpers.AssertErrorAsync(res, HttpStatusCode.NotFound);
@@ -327,7 +327,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
                 mascotaId = badPet,
                 tipoServicio = "Salud",
                 descripcion = "Consulta con mascota inexistente",
-                fechaConsulta = "2026-11-25T10:00:00Z",
+                fechaConsulta = "2099-05-15T10:00:00Z",
                 costo = 10000
             });
             await TestHelpers.AssertErrorAsync(res, HttpStatusCode.NotFound);
@@ -351,7 +351,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
                 mascotaId = mid,
                 tipoServicio = "Salud",
                 descripcion = "Mascota no pertenece al cliente",
-                fechaConsulta = "2026-11-25T10:00:00Z",
+                fechaConsulta = "2099-05-15T10:00:00Z",
                 costo = 25000
             });
             var error = await TestHelpers.AssertErrorAsync(res, HttpStatusCode.Conflict);
@@ -387,7 +387,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m1.Id,
             tipoServicio = "Estética",
             descripcion = "Cambio a servicio de estética completo",
-            fechaConsulta = "2026-11-29T12:00:00Z",
+            fechaConsulta = TestHelpers.FutureIso(7),
             costo = 55000.75m,
             estado = "EnProceso",
             observaciones = "Actualización 1"
@@ -405,7 +405,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m2.Id,
             tipoServicio = "Recreación",
             descripcion = "Reasignada a otro cliente y su propia mascota",
-            fechaConsulta = "2026-11-30T15:00:00Z",
+            fechaConsulta = TestHelpers.FutureIso(8),
             costo = 30000m,
             estado = "Completada",
             observaciones = "Actualización 2"
@@ -430,7 +430,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = 1,
             tipoServicio = "Salud",
             descripcion = "Prueba de ID inválido",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 1000,
             estado = "Programada"
         });
@@ -452,7 +452,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m.Id,
             tipoServicio = "Salud",
             descripcion = "Falta estado en PUT",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 20000
         });
         var err1 = await TestHelpers.AssertErrorAsync(noEstado, HttpStatusCode.BadRequest);
@@ -465,7 +465,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m.Id,
             tipoServicio = "Salud",
             descripcion = "Costo negativo en PUT",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = -10,
             estado = "Programada"
         });
@@ -485,7 +485,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = 1,
             tipoServicio = "Salud",
             descripcion = "No existe esta consulta",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 1000,
             estado = "Programada"
         });
@@ -509,7 +509,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m2.Id,
             tipoServicio = "Salud",
             descripcion = "Conflicto en actualización 1",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 10000,
             estado = "Programada"
         });
@@ -521,7 +521,7 @@ public sealed class ConsultasTests : IClassFixture<CustomWebApplicationFactory>
             mascotaId = m1.Id,
             tipoServicio = "Salud",
             descripcion = "Conflicto en actualización 2",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 10000,
             estado = "Programada"
         });

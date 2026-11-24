@@ -67,6 +67,19 @@ public static class DbInitializer
         CREATE INDEX IF NOT EXISTS ix_consultas_tipo_servicio       ON consultas(tipo_servicio);
         """;
 
+    public static string ResolveConnectionString(string connectionString, string contentRootPath)
+    {
+        var builder = new SqliteConnectionStringBuilder(connectionString);
+        if (!string.IsNullOrWhiteSpace(builder.DataSource) &&
+            !builder.DataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase) &&
+            !Path.IsPathRooted(builder.DataSource))
+        {
+            builder.DataSource = Path.GetFullPath(Path.Combine(contentRootPath, builder.DataSource));
+        }
+
+        return builder.ToString();
+    }
+
     public static async Task InitializeAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
