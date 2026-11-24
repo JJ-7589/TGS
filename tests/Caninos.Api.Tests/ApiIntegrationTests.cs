@@ -479,7 +479,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m1.Id,
             tipoServicio = "Salud",
             descripcion = "Intento con dueño equivocado",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 50000
         });
         Assert.Equal(HttpStatusCode.Conflict, mismatchRes.StatusCode);
@@ -492,7 +492,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m1.Id,
             tipoServicio = "Salud",
             descripcion = "Costo negativo inválido",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = -500
         });
         Assert.Equal(HttpStatusCode.BadRequest, badCosto.StatusCode);
@@ -503,7 +503,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m1.Id,
             tipoServicio = "Cirugia",
             descripcion = "Servicio fuera de catálogo",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 50000
         });
         Assert.Equal(HttpStatusCode.BadRequest, badServicio.StatusCode);
@@ -515,7 +515,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m1.Id,
             tipoServicio = "Salud",
             descripcion = "Vacunación anual y desparasitación",
-            fechaConsulta = "2026-11-25T10:00:00Z",
+            fechaConsulta = "2099-05-15T10:00:00Z",
             costo = 85000
         });
         Assert.Equal(HttpStatusCode.Created, c1Res.StatusCode);
@@ -531,7 +531,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m1.Id,
             tipoServicio = "Estética",
             descripcion = "Baño medicado y cepillado",
-            fechaConsulta = "2026-11-26T14:00:00Z",
+            fechaConsulta = "2099-05-16T14:00:00Z",
             costo = 45000.50,
             estado = "EnProceso"
         });
@@ -546,7 +546,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m2.Id,
             tipoServicio = "Recreación",
             descripcion = "Jornada de agilidad en parque",
-            fechaConsulta = "2026-11-27T09:00:00Z",
+            fechaConsulta = "2099-05-17T09:00:00Z",
             costo = 30000,
             estado = "Completada"
         });
@@ -608,7 +608,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             mascotaId = m1.Id,
             tipoServicio = "Salud",
             descripcion = "Vacunación completada con éxito",
-            fechaConsulta = "2026-11-25T10:30:00Z",
+            fechaConsulta = "2099-05-15T10:30:00Z",
             costo = 90000,
             estado = "Completada",
             observaciones = "Sin reacciones adversas"

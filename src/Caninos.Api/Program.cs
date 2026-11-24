@@ -15,15 +15,27 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
-var builder = WebApplication.CreateBuilder(args);
+var needsBaseDirContentRoot =
+    !File.Exists(Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json")) &&
+    File.Exists(Path.Combine(AppContext.BaseDirectory, "appsettings.json"));
+
+var builder = needsBaseDirContentRoot
+    ? WebApplication.CreateBuilder(new WebApplicationOptions
+    {
+        Args = args,
+        ContentRootPath = AppContext.BaseDirectory
+    })
+    : WebApplication.CreateBuilder(args);
 
 // Base de datos SQLite con integridad referencial activa en cada conexión
 builder.Services.AddSingleton<SqliteForeignKeysInterceptor>();
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    var connectionString = config.GetConnectionString("DefaultConnection")
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+    var rawConn = config.GetConnectionString("DefaultConnection")
         ?? "Data Source=storage/caninos.db;Foreign Keys=True";
+    var connectionString = DbInitializer.ResolveConnectionString(rawConn, env.ContentRootPath);
 
     options.UseSqlite(connectionString)
         .AddInterceptors(sp.GetRequiredService<SqliteForeignKeysInterceptor>());
@@ -210,7 +222,10 @@ app.UseStaticFiles(new StaticFileOptions
 // Servir el frontend (frontend-caninos) directamente desde http://localhost:5150/
 var frontendCandidates = new[]
 {
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "frontend-caninos")),
+    Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "frontend-caninos")),
     Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "frontend-caninos")),
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "frontend-caninos")),
     Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "frontend-caninos"))
 };
 var frontendDir = frontendCandidates.FirstOrDefault(Directory.Exists);

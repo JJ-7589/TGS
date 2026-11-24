@@ -20,6 +20,12 @@ internal static class TestHelpers
 
     public static string UniqueTag() => Guid.NewGuid().ToString("N")[..8];
 
+    public static string FutureIso(int daysAhead = 5) =>
+        DateTime.UtcNow.AddDays(daysAhead).ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    public static string FutureDateOnly(int daysAhead = 5) =>
+        DateTime.UtcNow.AddDays(daysAhead).ToString("yyyy-MM-dd");
+
     public static async Task<string> LoginAsAdminAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync("/api/auth/login", new
@@ -110,7 +116,7 @@ internal static class TestHelpers
         int mascotaId,
         string tipoServicio = "Salud",
         string estado = "Programada",
-        string fechaConsulta = "2026-11-25T10:00:00Z",
+        string? fechaConsulta = null,
         decimal costo = 50000m)
     {
         var res = await authClient.PostAsJsonAsync("/api/consultas", new
@@ -119,7 +125,7 @@ internal static class TestHelpers
             mascotaId,
             tipoServicio,
             descripcion = $"Servicio de {tipoServicio} para mascota {mascotaId}",
-            fechaConsulta,
+            fechaConsulta = fechaConsulta ?? FutureIso(5),
             costo,
             estado,
             observaciones = "Observación inicial"
