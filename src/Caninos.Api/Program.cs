@@ -46,6 +46,7 @@ builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<MascotaService>();
 builder.Services.AddScoped<UsuarioService>();
+builder.Services.AddScoped<OperacionService>();
 builder.Services.AddScoped<ConsultaService>();
 
 // Controladores con serialización JSON estricta y formato uniforme de errores 400

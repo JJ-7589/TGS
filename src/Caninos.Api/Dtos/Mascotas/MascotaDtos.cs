@@ -33,6 +33,8 @@ public sealed class UpdateMascotaRequest
 public sealed class ConsultaResumenDto
 {
     public int Id { get; set; }
+    public int? OperacionId { get; set; }
+    public string? OperacionNombre { get; set; }
     public string TipoServicio { get; set; } = string.Empty;
     public string Descripcion { get; set; } = string.Empty;
     public DateTime FechaConsulta { get; set; }

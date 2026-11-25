@@ -108,6 +108,14 @@ public sealed class PermissionsMiddleware
                 // Todo usuario autenticado gestiona su propio perfil y sube fotos de sus mascotas
                 break;
 
+            case "operaciones":
+                // Cualquier usuario autenticado puede consultar el catálogo y precios; solo admin puede modificarlo
+                if (!HttpMethods.IsGet(method))
+                {
+                    throw new ApiForbiddenException("Solo un administrador puede crear, actualizar o eliminar operaciones y tarifas.");
+                }
+                break;
+
             case "usuarios":
                 await EnforceUsuarioPermissionsAsync(context, currentUser, segments, method);
                 break;

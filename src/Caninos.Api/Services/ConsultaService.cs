@@ -26,6 +26,7 @@ public sealed class ConsultaService
             .AsNoTracking()
             .Include(c => c.Mascota)
             .Include(c => c.Usuario)
+            .Include(c => c.Operacion)
             .AsQueryable();
 
         if (userId.HasValue)
@@ -61,6 +62,7 @@ public sealed class ConsultaService
             .AsNoTracking()
             .Include(c => c.Mascota)
             .Include(c => c.Usuario)
+            .Include(c => c.Operacion)
             .FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new ApiNotFoundException($"No se encontró ninguna consulta con id {id}.");
 
@@ -94,17 +96,69 @@ public sealed class ConsultaService
         return await GetAllAsync(userId: scopedUserId, mascotaId: null, tipoServicioNormalizado, estado: null);
     }
 
-    public async Task<ConsultaResponse> CreateAsync(CreateConsultaRequest request)
+    public async Task<ConsultaResponse> CreateAsync(CreateConsultaRequest request, bool isAdmin = true)
     {
         var errors = new Dictionary<string, List<string>>();
         var userId = DomainValidation.ValidateForeignKeyId(request.UserId, "userId", errors);
         var mascotaId = DomainValidation.ValidateForeignKeyId(request.MascotaId, "mascotaId", errors);
-        var tipoServicio = DomainValidation.ValidateTipoServicio(request.TipoServicio, errors);
-        var descripcion = DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
-        // No se permite programar citas nuevas antes de la fecha/hora actual
+
+        Operacion? operacion = null;
+        if (request.OperacionId.HasValue)
+        {
+            if (request.OperacionId.Value <= 0)
+            {
+                DomainValidation.AddError(errors, "operacionId", "El campo 'operacionId' debe ser un entero positivo mayor a 0.");
+            }
+            else
+            {
+                operacion = await _db.Operaciones
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(o => o.Id == request.OperacionId.Value);
+
+                if (operacion is null)
+                {
+                    throw new ApiNotFoundException($"No existe una operación con id {request.OperacionId.Value}.");
+                }
+
+                if (!operacion.Activo)
+                {
+                    throw new ApiConflictException("La operación seleccionada está inactiva y no admite nuevas citas.");
+                }
+            }
+        }
+
+        string tipoServicio;
+        decimal costo;
+        string descripcion;
+        string estado;
+
+        if (operacion is not null)
+        {
+            // Al elegir una operación del catálogo, tipoServicio, costo, descripción por defecto y estado se resuelven automáticamente
+            tipoServicio = operacion.TipoServicio;
+
+            costo = (!isAdmin || request.Costo is null)
+                ? operacion.Costo
+                : DomainValidation.ValidateCosto(request.Costo, errors);
+
+            descripcion = string.IsNullOrWhiteSpace(request.Descripcion)
+                ? BuildAutoDescripcion(operacion)
+                : DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
+
+            // Para rol 'usuario' el estado al agendar con procedimiento es siempre automático ('Programada')
+            estado = !isAdmin
+                ? "Programada"
+                : DomainValidation.ValidateEstadoConsulta(request.Estado, required: false, errors);
+        }
+        else
+        {
+            tipoServicio = DomainValidation.ValidateTipoServicio(request.TipoServicio, errors);
+            descripcion = DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
+            costo = DomainValidation.ValidateCosto(request.Costo, errors);
+            estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: false, errors);
+        }
+
         var fechaConsulta = DomainValidation.ValidateFechaConsulta(request.FechaConsulta, errors, disallowPast: true);
-        var costo = DomainValidation.ValidateCosto(request.Costo, errors);
-        var estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: false, errors);
         var observaciones = DomainValidation.ValidateOptionalText(request.Observaciones, "observaciones", "observaciones", 500, errors);
         DomainValidation.ThrowIfErrors(errors);
 
@@ -114,6 +168,7 @@ public sealed class ConsultaService
         {
             UserId = userId,
             MascotaId = mascotaId,
+            OperacionId = operacion?.Id,
             TipoServicio = tipoServicio,
             Descripcion = descripcion,
             FechaConsulta = fechaConsulta,
@@ -128,10 +183,11 @@ public sealed class ConsultaService
 
         consulta.Usuario = usuario;
         consulta.Mascota = mascota;
+        consulta.Operacion = operacion;
         return ToResponse(consulta);
     }
 
-    public async Task<ConsultaResponse> UpdateAsync(int id, UpdateConsultaRequest request)
+    public async Task<ConsultaResponse> UpdateAsync(int id, UpdateConsultaRequest request, bool isAdmin = true)
     {
         var consulta = await _db.Consultas.FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new ApiNotFoundException($"No se encontró ninguna consulta con id {id}.");
@@ -139,13 +195,81 @@ public sealed class ConsultaService
         var errors = new Dictionary<string, List<string>>();
         var userId = DomainValidation.ValidateForeignKeyId(request.UserId, "userId", errors);
         var mascotaId = DomainValidation.ValidateForeignKeyId(request.MascotaId, "mascotaId", errors);
-        var tipoServicio = DomainValidation.ValidateTipoServicio(request.TipoServicio, errors);
-        var descripcion = DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
-        var estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: true, errors);
-        // Si se reprograma o mantiene como Programada, no puede quedar en el pasado
+
+        Operacion? operacion = null;
+        if (request.OperacionId.HasValue)
+        {
+            if (request.OperacionId.Value <= 0)
+            {
+                DomainValidation.AddError(errors, "operacionId", "El campo 'operacionId' debe ser un entero positivo mayor a 0.");
+            }
+            else
+            {
+                operacion = await _db.Operaciones
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(o => o.Id == request.OperacionId.Value);
+
+                if (operacion is null)
+                {
+                    throw new ApiNotFoundException($"No existe una operación con id {request.OperacionId.Value}.");
+                }
+
+                if (!operacion.Activo && consulta.OperacionId != operacion.Id)
+                {
+                    throw new ApiConflictException("La operación seleccionada está inactiva y no se puede asignar.");
+                }
+            }
+        }
+
+        string tipoServicio;
+        decimal costo;
+        string descripcion;
+        string estado;
+
+        if (operacion is not null)
+        {
+            tipoServicio = operacion.TipoServicio;
+
+            costo = (!isAdmin || request.Costo is null)
+                ? operacion.Costo
+                : DomainValidation.ValidateCosto(request.Costo, errors);
+
+            descripcion = string.IsNullOrWhiteSpace(request.Descripcion)
+                ? BuildAutoDescripcion(operacion)
+                : DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
+
+            if (!isAdmin)
+            {
+                // Para un usuario estándar el estado se gestiona automáticamente (conserva el actual o permite cancelar)
+                if (request.Estado is null)
+                {
+                    estado = consulta.Estado;
+                }
+                else
+                {
+                    var parsedEstado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: true, errors);
+                    if (errors.Count == 0 && parsedEstado is not ("Programada" or "Cancelada") && parsedEstado != consulta.Estado)
+                    {
+                        throw new ApiForbiddenException("Solo un administrador puede marcar una consulta como 'EnProceso' o 'Completada'.");
+                    }
+                    estado = parsedEstado;
+                }
+            }
+            else
+            {
+                estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: true, errors);
+            }
+        }
+        else
+        {
+            tipoServicio = DomainValidation.ValidateTipoServicio(request.TipoServicio, errors);
+            descripcion = DomainValidation.ValidateRequiredText(request.Descripcion, "descripcion", "descripcion", 5, 500, errors);
+            costo = DomainValidation.ValidateCosto(request.Costo, errors);
+            estado = DomainValidation.ValidateEstadoConsulta(request.Estado, required: true, errors);
+        }
+
         var disallowPast = estado == "Programada";
         var fechaConsulta = DomainValidation.ValidateFechaConsulta(request.FechaConsulta, errors, disallowPast);
-        var costo = DomainValidation.ValidateCosto(request.Costo, errors);
         var observaciones = DomainValidation.ValidateOptionalText(request.Observaciones, "observaciones", "observaciones", 500, errors);
         DomainValidation.ThrowIfErrors(errors);
 
@@ -153,6 +277,7 @@ public sealed class ConsultaService
 
         consulta.UserId = userId;
         consulta.MascotaId = mascotaId;
+        consulta.OperacionId = operacion?.Id;
         consulta.TipoServicio = tipoServicio;
         consulta.Descripcion = descripcion;
         consulta.FechaConsulta = fechaConsulta;
@@ -164,6 +289,7 @@ public sealed class ConsultaService
 
         consulta.Usuario = usuario;
         consulta.Mascota = mascota;
+        consulta.Operacion = operacion;
         return ToResponse(consulta);
     }
 
@@ -174,6 +300,17 @@ public sealed class ConsultaService
 
         _db.Consultas.Remove(consulta);
         await _db.SaveChangesAsync();
+    }
+
+    private static string BuildAutoDescripcion(Operacion op)
+    {
+        if (string.IsNullOrWhiteSpace(op.Descripcion))
+        {
+            return op.Nombre.Length >= 5 ? op.Nombre : $"Procedimiento: {op.Nombre}";
+        }
+
+        var combined = $"{op.Nombre} — {op.Descripcion}";
+        return combined.Length <= 500 ? combined : combined[..500];
     }
 
     private async Task<(Usuario Usuario, Mascota Mascota)> ValidateRelationalOwnershipAsync(int userId, int mascotaId)
@@ -202,6 +339,8 @@ public sealed class ConsultaService
         Id = consulta.Id,
         MascotaId = consulta.MascotaId,
         UserId = consulta.UserId,
+        OperacionId = consulta.OperacionId,
+        OperacionNombre = consulta.Operacion?.Nombre,
         TipoServicio = consulta.TipoServicio,
         Descripcion = consulta.Descripcion,
         FechaConsulta = consulta.FechaConsulta,

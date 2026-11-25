@@ -20,6 +20,7 @@ Consulta el contrato completo de endpoints, roles, tipos de datos, códigos HTTP
   - **Fotos:** soporte para subir imagen real (`POST /api/uploads/mascotas`, JPG/PNG/WEBP máx. 5 MB) o pegar URL (`fotoUrl`).
   - **Historial indexado:** `GET /api/mascotas/{id}/historial` respaldado por índices `ix_consultas_mascota_id` e `ix_consultas_mascota_id_fecha` en SQLite para acelerar las cargas.
 - **Validación de fecha de citas:** bloquea la programación de citas anteriores a la fecha y hora actual tanto en backend (`400 Bad Request`) como en frontend.
+- **Catálogo dinámico de `operaciones` y cálculo automático:** tabla SQLite `operaciones` (`costo`, `tipo_servicio`, `descripcion`, `activo`) relacionada con `consultas` e historial (`operacion_id`). El usuario solo elige el procedimiento y el sistema calcula automáticamente el **costo**, la **categoría** y el **estado `Programada`**; el administrador puede editar tarifas en tiempo real desde la pestaña **⚙️ Operaciones y Tarifas**.
 
 ## Cómo emular / ejecutar el sistema completo en local
 
