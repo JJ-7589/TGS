@@ -645,7 +645,7 @@ public sealed class ApiIntegrationTests : IClassFixture<CustomWebApplicationFact
             {
                 tables.Add(reader.GetString(0));
             }
-            Assert.Equal(new[] { "consultas", "mascotas", "usuarios" }, tables);
+            Assert.Equal(new[] { "consultas", "mascotas", "operaciones", "usuarios" }, tables);
         }
 
         // Verifica FKs en consultas: mascota_id -> mascotas(id) y user_id -> usuarios(id)

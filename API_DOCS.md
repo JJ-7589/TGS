@@ -45,11 +45,18 @@ Al iniciar el backend por primera vez con la base de datos vacía, se crea autom
 | `PUT` | `/api/perfil` | Autenticado (`usuario` / `admin`) | Actualiza los datos personales propios sin modificar el rol. |
 | `PUT` | `/api/perfil/password` | Autenticado (`usuario` / `admin`) | Cambia la contraseña numérica (`passwordActual`, `passwordNueva`, `confirmarPassword`). |
 | `POST` | `/api/uploads/mascotas` | Autenticado (`usuario` / `admin`) | Sube foto de mascota (`multipart/form-data`, campo `file`, JPG/PNG/WEBP máx. 5 MB) y devuelve `{ "fotoUrl": "/uploads/mascotas/..." }`. |
-| `GET` | `/api/mascotas/{id}/historial` | Dueño o `admin` | Devuelve `proximaCita`, `citasPrevias` y `todasLasConsultas` usando el índice compuesto `ix_consultas_mascota_id_fecha` sobre `mascota_id`. |
+| `GET` | `/api/mascotas/{id}/historial` | Dueño o `admin` | Devuelve `proximaCita`, `citasPrevias` y `todasLasConsultas` (con `operacionId` y `operacionNombre`) usando el índice compuesto `ix_consultas_mascota_id_fecha`. |
+| `GET` | `/api/operaciones` | Autenticado (`usuario` / `admin`) | Lista el catálogo dinámico de operaciones/procedimientos y sus precios (`?tipoServicio=&soloActivas=true`). |
+| `GET` | `/api/operaciones/{id}` | Autenticado (`usuario` / `admin`) | Obtiene el detalle y costo actual de una operación. |
+| `POST` | `/api/operaciones` | Solo `admin` | Crea un nuevo procedimiento en el catálogo con `nombre`, `tipoServicio`, `descripcion`, `costo` y `activo`. |
+| `PUT` | `/api/operaciones/{id}` | Solo `admin` | Actualiza dinámicamente el nombre, categoría, disponibilidad o `costo` en la base de datos. |
+| `DELETE` | `/api/operaciones/{id}` | Solo `admin` | Elimina la operación si no está asociada al historial de consultas (`409 Conflict` si ya tiene historial). |
 
-> **Campos adicionales:**
+> **Campos adicionales y cálculo automático:**
 > - `UsuarioResponse` incluye `rol` (`"usuario"` | `"admin"`).
 > - `MascotaResponse` incluye `fotoUrl`, `proximaCita` y `totalHistorial`.
+> - `ConsultaResponse` y `ConsultaResumenDto` incluyen `operacionId` y `operacionNombre`.
+> - Al enviar `operacionId` en `POST /api/consultas` (ej. `{ "mascotaId": 1, "operacionId": 2, "fechaConsulta": "..." }`), el backend calcula y asigna **automáticamente** `costo`, `tipoServicio`, `descripcion` desde la tabla `operaciones`, y asigna `estado = "Programada"` automáticamente para el rol `usuario`.
 > - `POST /api/consultas` (y `PUT /api/consultas/{id}` con estado `Programada`) valida que `fechaConsulta` **no sea anterior a la fecha y hora actual** (`400 Bad Request`).
 
 ---

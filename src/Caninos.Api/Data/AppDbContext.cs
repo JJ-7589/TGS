@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Mascota> Mascotas => Set<Mascota>();
+    public DbSet<Operacion> Operaciones => Set<Operacion>();
     public DbSet<Consulta> Consultas => Set<Consulta>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -87,6 +88,28 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<Operacion>(entity =>
+        {
+            entity.ToTable("operaciones", table =>
+            {
+                table.HasCheckConstraint("ck_operaciones_tipo_servicio", "tipo_servicio IN ('Salud', 'Estetica', 'Recreacion')");
+                table.HasCheckConstraint("ck_operaciones_costo", "costo >= 0 AND costo <= 100000000");
+                table.HasCheckConstraint("ck_operaciones_activo", "activo IN (0, 1)");
+            });
+            entity.HasKey(o => o.Id);
+
+            entity.Property(o => o.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(o => o.Nombre).HasColumnName("nombre").IsRequired().HasMaxLength(120).UseCollation("NOCASE");
+            entity.Property(o => o.TipoServicio).HasColumnName("tipo_servicio").IsRequired().HasMaxLength(20);
+            entity.Property(o => o.Descripcion).HasColumnName("descripcion").HasMaxLength(300);
+            entity.Property(o => o.Costo).HasColumnName("costo").HasColumnType("REAL").IsRequired().HasConversion(decimalToRealConverter);
+            entity.Property(o => o.Activo).HasColumnName("activo").IsRequired().HasDefaultValue(true);
+            entity.Property(o => o.FechaCreacion).HasColumnName("fecha_creacion").IsRequired().HasConversion(utcDateTimeConverter);
+
+            entity.HasIndex(o => o.Nombre).IsUnique();
+            entity.HasIndex(o => new { o.TipoServicio, o.Activo }).HasDatabaseName("ix_operaciones_tipo_servicio");
+        });
+
         modelBuilder.Entity<Consulta>(entity =>
         {
             entity.ToTable("consultas", table =>
@@ -100,6 +123,7 @@ public class AppDbContext : DbContext
             entity.Property(c => c.Id).HasColumnName("id").ValueGeneratedOnAdd();
             entity.Property(c => c.MascotaId).HasColumnName("mascota_id").IsRequired();
             entity.Property(c => c.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(c => c.OperacionId).HasColumnName("operacion_id");
             entity.Property(c => c.TipoServicio).HasColumnName("tipo_servicio").IsRequired().HasMaxLength(20);
             entity.Property(c => c.Descripcion).HasColumnName("descripcion").IsRequired().HasMaxLength(500);
             entity.Property(c => c.FechaConsulta).HasColumnName("fecha_consulta").IsRequired().HasConversion(utcDateTimeConverter);
@@ -111,6 +135,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(c => c.MascotaId).HasDatabaseName("ix_consultas_mascota_id");
             entity.HasIndex(c => new { c.MascotaId, c.FechaConsulta, c.Estado }).HasDatabaseName("ix_consultas_mascota_id_fecha");
             entity.HasIndex(c => c.UserId).HasDatabaseName("ix_consultas_user_id");
+            entity.HasIndex(c => c.OperacionId).HasDatabaseName("ix_consultas_operacion_id");
             entity.HasIndex(c => c.TipoServicio).HasDatabaseName("ix_consultas_tipo_servicio");
 
             entity.HasOne(c => c.Mascota)
@@ -123,6 +148,12 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.Consultas)
                 .HasForeignKey(c => c.UserId)
                 .HasConstraintName("fk_consultas_usuarios")
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(c => c.Operacion)
+                .WithMany(o => o.Consultas)
+                .HasForeignKey(c => c.OperacionId)
+                .HasConstraintName("fk_consultas_operaciones")
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

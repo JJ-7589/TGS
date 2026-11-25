@@ -58,6 +58,7 @@ public sealed class MascotaService
             .AsNoTracking()
             .Include(c => c.Mascota)
             .Include(c => c.Usuario)
+            .Include(c => c.Operacion)
             .Where(c => c.MascotaId == mascotaId)
             .OrderByDescending(c => c.FechaConsulta)
             .ThenByDescending(c => c.Id)
@@ -207,6 +208,7 @@ public sealed class MascotaService
         // Aprovecha el índice ix_consultas_mascota_id_fecha evitando consultas N+1
         var consultas = await _db.Consultas
             .AsNoTracking()
+            .Include(c => c.Operacion)
             .Where(c => ids.Contains(c.MascotaId))
             .ToListAsync();
 
@@ -239,6 +241,8 @@ public sealed class MascotaService
     private static ConsultaResumenDto ToResumen(Consulta c) => new()
     {
         Id = c.Id,
+        OperacionId = c.OperacionId,
+        OperacionNombre = c.Operacion?.Nombre,
         TipoServicio = c.TipoServicio,
         Descripcion = c.Descripcion,
         FechaConsulta = c.FechaConsulta,

@@ -114,7 +114,7 @@ public sealed class ConsultasController : ControllerBase
             request.UserId = currentUser.UserId;
         }
 
-        var created = await _consultaService.CreateAsync(request);
+        var created = await _consultaService.CreateAsync(request, isAdmin: currentUser.IsAdmin);
         return Created($"/api/consultas/{created.Id}", created);
     }
 
@@ -134,7 +134,7 @@ public sealed class ConsultasController : ControllerBase
             request.UserId = currentUser.UserId;
         }
 
-        var updated = await _consultaService.UpdateAsync(parsedId, request);
+        var updated = await _consultaService.UpdateAsync(parsedId, request, isAdmin: currentUser.IsAdmin);
         return Ok(updated);
     }
 

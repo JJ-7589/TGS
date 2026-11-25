@@ -2,9 +2,10 @@
 -- Sistema para el registro de salud, estetica y recreacion de caninos
 -- Motor: SQLite 3
 -- Relaciones:
---   - usuarios (1) -> mascotas (N)   [mascotas.user_id -> usuarios.id]
---   - mascotas (1) -> consultas (N)  [consultas.mascota_id -> mascotas.id]
---   - consultas (N) -> usuarios (1)  [consultas.user_id -> usuarios.id]
+--   - usuarios (1) -> mascotas (N)      [mascotas.user_id -> usuarios.id]
+--   - mascotas (1) -> consultas (N)     [consultas.mascota_id -> mascotas.id]
+--   - consultas (N) -> usuarios (1)     [consultas.user_id -> usuarios.id]
+--   - operaciones (1) -> consultas (N)  [consultas.operacion_id -> operaciones.id]
 -- Roles soportados: 'usuario', 'admin'
 -- ============================================================================
 
@@ -41,10 +42,21 @@ CREATE TABLE IF NOT EXISTS mascotas (
         FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE RESTRICT
 );
 
+CREATE TABLE IF NOT EXISTS operaciones (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    tipo_servicio   TEXT    NOT NULL CHECK (tipo_servicio IN ('Salud', 'Estetica', 'Recreacion')),
+    descripcion     TEXT    NULL,
+    costo           REAL    NOT NULL CHECK (costo >= 0 AND costo <= 100000000),
+    activo          INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+    fecha_creacion  TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS consultas (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     mascota_id      INTEGER NOT NULL,
     user_id         INTEGER NOT NULL,
+    operacion_id    INTEGER NULL,
     tipo_servicio   TEXT    NOT NULL CHECK (tipo_servicio IN ('Salud', 'Estetica', 'Recreacion')),
     descripcion     TEXT    NOT NULL,
     fecha_consulta  TEXT    NOT NULL,
@@ -56,11 +68,15 @@ CREATE TABLE IF NOT EXISTS consultas (
     CONSTRAINT fk_consultas_mascotas
         FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE RESTRICT,
     CONSTRAINT fk_consultas_usuarios
-        FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE RESTRICT
+        FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_consultas_operaciones
+        FOREIGN KEY (operacion_id) REFERENCES operaciones(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX IF NOT EXISTS ix_mascotas_user_id              ON mascotas(user_id);
+CREATE INDEX IF NOT EXISTS ix_operaciones_tipo_servicio     ON operaciones(tipo_servicio, activo);
 CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id          ON consultas(mascota_id);
 CREATE INDEX IF NOT EXISTS ix_consultas_mascota_id_fecha    ON consultas(mascota_id, fecha_consulta DESC, estado);
 CREATE INDEX IF NOT EXISTS ix_consultas_user_id             ON consultas(user_id);
+CREATE INDEX IF NOT EXISTS ix_consultas_operacion_id        ON consultas(operacion_id);
 CREATE INDEX IF NOT EXISTS ix_consultas_tipo_servicio       ON consultas(tipo_servicio);

@@ -4,6 +4,7 @@ public sealed class CreateConsultaRequest
 {
     public int? UserId { get; set; }
     public int? MascotaId { get; set; }
+    public int? OperacionId { get; set; }
     public string? TipoServicio { get; set; }
     public string? Descripcion { get; set; }
     public DateTime? FechaConsulta { get; set; }
@@ -16,6 +17,7 @@ public sealed class UpdateConsultaRequest
 {
     public int? UserId { get; set; }
     public int? MascotaId { get; set; }
+    public int? OperacionId { get; set; }
     public string? TipoServicio { get; set; }
     public string? Descripcion { get; set; }
     public DateTime? FechaConsulta { get; set; }
@@ -29,6 +31,8 @@ public sealed class ConsultaResponse
     public int Id { get; set; }
     public int MascotaId { get; set; }
     public int UserId { get; set; }
+    public int? OperacionId { get; set; }
+    public string? OperacionNombre { get; set; }
     public string TipoServicio { get; set; } = string.Empty;
     public string Descripcion { get; set; } = string.Empty;
     public DateTime FechaConsulta { get; set; }
